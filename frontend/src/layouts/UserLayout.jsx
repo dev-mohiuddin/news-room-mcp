@@ -29,7 +29,7 @@ export default function UserLayout() {
   const title = TITLE_MAP[location.pathname] || "Workspace";
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden">
       <BackgroundOrbs gridBg={false} />
 
       <Sidebar nav={USER_NAV} variant="user" />

@@ -28,7 +28,7 @@ export default function SuperAdminLayout() {
     (location.pathname.startsWith("/admin/users") ? "User Detail" : "Admin");
 
   return (
-    <div className="relative flex h-screen overflow-hidden bg-background">
+    <div className="relative flex h-screen overflow-hidden">
       <BackgroundOrbs gridBg={false} />
 
       <Sidebar nav={SUPER_ADMIN_NAV} variant="admin" />
