@@ -2,7 +2,7 @@ import axios from "axios";
 import { handleLogout } from "./utils.js";
 import { startProgress, setProgress, doneProgress } from "./progress.js";
 
-const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const baseUrl = import.meta.env.VITE_API_URL;
 
 let isLoggingOut = false;
 
