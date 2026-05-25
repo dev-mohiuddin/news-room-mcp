@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Newsroom MCP — Project Proposal</title>
+<style>
+  @page { size: A4; margin: 2.5cm 2cm; }
+  body {
+    font-family: 'Segoe UI', Calibri, Arial, sans-serif;
+    line-height: 1.65;
+    color: #1a1a2e;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    background: #ffffff;
+  }
+  h1 {
+    font-size: 32px;
+    color: #1a1a2e;
+    border-bottom: 3px solid #3B82F6;
+    padding-bottom: 10px;
+    margin-top: 40px;
+    page-break-before: auto;
+  }
+  h1:first-of-type { page-break-before: avoid; }
+  h2 {
+    font-size: 24px;
+    color: #1e293b;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 6px;
+    margin-top: 32px;
+    page-break-after: avoid;
+  }
+  h3 {
+    font-size: 18px;
+    color: #334155;
+    margin-top: 24px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-size: 15px;
+    color: #475569;
+    margin-top: 18px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  p { margin: 0.7em 0; text-align: justify; }
+  strong { color: #0f172a; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 13px;
+    page-break-inside: avoid;
+  }
+  th {
+    background: #f1f5f9;
+    color: #1e293b;
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid #cbd5e1;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  pre {
+    background: #f1f5f9;
+    border-left: 4px solid #8B5CF6;
+    padding: 14px 18px;
+    overflow-x: auto;
+    border-radius: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+    page-break-inside: avoid;
+  }
+  code {
+    font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+    background: #f1f5f9;
+    color: #7c3aed;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  pre code { background: none; color: #0f172a; padding: 0; }
+  blockquote {
+    border-left: 4px solid #2DD4BF;
+    background: #f0fdfa;
+    margin: 16px 0;
+    padding: 12px 18px;
+    color: #0f766e;
+    font-style: italic;
+  }
+  hr {
+    border: none;
+    border-top: 2px solid #e2e8f0;
+    margin: 32px 0;
+  }
+  ul, ol {
+    margin: 8px 0;
+    padding-left: 28px;
+  }
+  li { margin: 4px 0; }
+  a { color: #3B82F6; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .cover {
+    text-align: center;
+    padding: 80px 20px;
+    page-break-after: always;
+  }
+  .cover h1 {
+    font-size: 48px;
+    border: none;
+    background: linear-gradient(135deg, #3B82F6, #8B5CF6, #2DD4BF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+  .cover .subtitle {
+    font-size: 22px;
+    color: #475569;
+    margin-bottom: 60px;
+  }
+  @media print {
+    body { padding: 0; }
+    h1 { page-break-before: always; }
+    h1:first-of-type { page-break-before: avoid; }
+  }
+</style>
+</head>
+<body>
+<h1>Newsroom MCP</h1>
+
+<h2>AI-Powered Content Publishing Platform — Project Proposal</h2>
+
+<hr/>
+
+<strong>Prepared for:</strong> [Client Name]
+<strong>Document version:</strong> 1.0
+<strong>Date:</strong> May 2026
+<strong>Status:</strong> Frontend Complete • Backend Boilerplate Ready • Ready for Demo
+
+<hr/>
+
+<h2>Table of Contents</h2>
+
+<ol><li>[Executive Summary](#1-executive-summary)</li></ol>
+<ol><li>[The Problem We're Solving](#2-the-problem-were-solving)</li></ol>
+<ol><li>[Product Vision](#3-product-vision)</li></ol>
+<ol><li>[Technology Architecture](#4-technology-architecture)</li></ol>
+<ol><li>[Public-Facing Experience](#5-public-facing-experience)</li></ol>
+<ol><li>[Authentication System](#6-authentication-system)</li></ol>
+<ol><li>[Super Admin Panel — Complete Walkthrough](#7-super-admin-panel--complete-walkthrough)</li></ol>
+<ol><li>[User Panel — Complete Walkthrough](#8-user-panel--complete-walkthrough)</li></ol>
+<ol><li>[AI Agent Architecture](#9-ai-agent-architecture)</li></ol>
+<ol><li>[End-to-End Workflows](#10-end-to-end-workflows)</li></ol>
+<ol><li>[Security, Privacy & Compliance](#11-security-privacy--compliance)</li></ol>
+<ol><li>[Pricing & Business Model](#12-pricing--business-model)</li></ol>
+<ol><li>[Project Delivery Status](#13-project-delivery-status)</li></ol>
+<ol><li>[Demo Access](#14-demo-access)</li></ol>
+<ol><li>[Roadmap](#15-roadmap)</li></ol>
+
+<hr/>
+
+<h2>1. Executive Summary</h2>
+
+<strong>Newsroom MCP</strong> is a production-grade Software-as-a-Service (SaaS) platform that connects AI assistants to the complete article publishing workflow — from topic research to live CMS publication. The platform empowers publishers, bloggers, agencies, and newsrooms to compress what previously took 6 to 8 hours of work into approximately 30 minutes, without compromising editorial quality or brand voice consistency.
+
+<p>The system has been designed and developed as a multi-tenant SaaS platform with two distinct operational interfaces: a <strong>Super Admin Panel</strong> for platform owners to manage the entire ecosystem, and a <strong>User Panel</strong> for paying customers (tenants) who use the platform to create and publish content. A premium glassmorphism design language unifies both interfaces, providing an experience comparable to industry-leading SaaS products such as Linear, Vercel, and Stripe.</p>
+
+<h3>Current Delivery Status</h3>
+
+<p>| Layer | Status | Coverage |</p>
+<p>|---|---|---|</p>
+<p>| <strong>Public Landing Page</strong> | ✅ Complete | All 11 sections animated |</p>
+<p>| <strong>Authentication System</strong> | ✅ Complete | Login, register, forgot/reset, demo accounts |</p>
+<p>| <strong>Super Admin Panel</strong> | ✅ Complete | All 12 pages fully designed and functional |</p>
+<p>| <strong>User Panel</strong> | ✅ Complete | All 15 pages including 5-step article wizard |</p>
+<p>| <strong>Design System</strong> | ✅ Complete | Dark + Light mode, glassmorphism, gradient palette |</p>
+<p>| <strong>Backend Boilerplate</strong> | ✅ Complete | Scalable folder structure, utilities, middlewares |</p>
+<p>| <strong>AI Agent Integration</strong> | 🔄 Next phase | Architecture designed, ready for implementation |</p>
+<p>| <strong>Database & API logic</strong> | 🔄 Next phase | Schemas designed in system document |</p>
+
+<p>The frontend is fully demoable today. The client can experience every screen, interact with every form, and walk through the complete user journey. Mock data is intelligently embedded so that every page demonstrates real-world scenarios.</p>
+
+<hr/>
+
+<h2>2. The Problem We're Solving</h2>
+
+<p>Modern content publishing is fragmented across too many tools and manual steps. A single article typically requires:</p>
+
+<ol><li>**Research** — Opening 10-20 browser tabs, reading sources, taking notes, manually summarizing findings</li></ol>
+<ol><li>**Outlining** — Structuring sections, deciding on depth and angle</li></ol>
+<ol><li>**Writing** — Producing 1,500 to 3,000 words of original, on-brand content</li></ol>
+<ol><li>**SEO Optimization** — Crafting meta titles, descriptions, slugs, FAQ schema, internal links</li></ol>
+<ol><li>**CMS Publishing** — Switching to WordPress or Ghost, formatting, uploading images, scheduling</li></ol>
+
+<p>This workflow consumes 6-8 hours per article for skilled writers. For publishers running multiple blogs or newsrooms producing daily content, the bottleneck is severe. Existing AI writing tools handle one or two of these steps but force users to coordinate the rest manually.</p>
+
+<h3>The market gap</h3>
+
+<p>| Existing tool category | What it does | What it misses |</p>
+<p>|---|---|---|</p>
+<p>| AI writers (Jasper, Copy.ai) | Generate text | No research, no SEO, no CMS connection |</p>
+<p>| SEO tools (Surfer, Frase) | Optimize for search | No writing, no publishing |</p>
+<p>| Research tools (Perplexity) | Find sources | No structured output for publishing |</p>
+<p>| CMS plugins (Yoast) | Format & publish | No AI content generation |</p>
+
+<strong>Newsroom MCP unifies all five steps into a single, AI-orchestrated workflow.</strong>
+
+<hr/>
+
+<h2>3. Product Vision</h2>
+
+<h3>Tagline</h3>
+
+<blockquote>Publish Smarter. Write with AI. Reach Further.</blockquote>
+
+<h3>Core promise</h3>
+
+<p>A publisher logs in, types a topic, and within 30 minutes has a researched, written, SEO-optimized article live on their WordPress, Ghost, Contentful, Sanity, or Notion site — all matched to their unique brand voice, with quality indistinguishable from human-written content.</p>
+
+<h3>Target audience</h3>
+
+<p>| Segment | Profile | Plan fit |</p>
+<p>|---|---|---|</p>
+<p>| <strong>Solo bloggers</strong> | Hobbyist or part-time content creators | Free / Starter |</p>
+<p>| <strong>Independent publishers</strong> | Small newsletter or niche blog operators | Starter / Pro |</p>
+<p>| <strong>Content agencies</strong> | Manage 3-15 client blogs | Pro / Agency |</p>
+<p>| <strong>Newsrooms</strong> | Editorial teams producing daily content | Pro / Agency |</p>
+<p>| <strong>Enterprise content teams</strong> | Brand publications, corporate blogs | Agency |</p>
+
+<h3>Value propositions by segment</h3>
+
+<ul><li>**Solo publisher:** Reduce article production time from 8 hours to 30 minutes; maintain consistent quality</li></ul>
+<ul><li>**Agency:** Manage multiple client brand voices from one dashboard; scale content output 10x without hiring</li></ul>
+<ul><li>**Newsroom:** Free editorial staff from research and SEO formatting to focus on high-value journalism</li></ul>
+<ul><li>**Enterprise:** Centralize content production with role-based workflow, audit logs, and compliance tracking</li></ul>
+
+<hr/>
+
+<h2>4. Technology Architecture</h2>
+
+<h3>Frontend Stack</h3>
+
+<p>| Technology | Purpose |</p>
+<p>|---|---|</p>
+<p>| <strong>React 19</strong> | Modern UI framework with concurrent features |</p>
+<p>| <strong>Vite 6</strong> | Lightning-fast development and build tooling |</p>
+<p>| <strong>Redux Toolkit + Persist</strong> | Global state management with session persistence |</p>
+<p>| <strong>React Router v7</strong> | Nested routing with role-based guards |</p>
+<p>| <strong>Shadcn UI + Radix Primitives</strong> | Accessible, composable component library |</p>
+<p>| <strong>Tailwind CSS v4</strong> | Utility-first styling with custom design tokens |</p>
+<p>| <strong>Framer Motion</strong> | Production-grade animations and page transitions |</p>
+<p>| <strong>React Hook Form + Zod</strong> | Type-safe form handling with validation |</p>
+<p>| <strong>Recharts</strong> | Data visualization for analytics dashboards |</p>
+<p>| <strong>Axios</strong> | HTTP client with interceptors and automatic auth |</p>
+<p>| <strong>Sonner</strong> | Beautiful toast notifications |</p>
+
+
+<h3>Backend Stack</h3>
+
+<p>| Technology | Purpose |</p>
+<p>|---|---|</p>
+<p>| <strong>Node.js 20 LTS</strong> | Server runtime |</p>
+<p>| <strong>Express.js 5</strong> | REST API framework |</p>
+<p>| <strong>MongoDB + Mongoose</strong> | Document database with ODM |</p>
+<p>| <strong>Socket.io</strong> | Real-time updates for AI generation streaming |</p>
+<p>| <strong>JWT + bcrypt</strong> | Authentication and password hashing |</p>
+<p>| <strong>Winston</strong> | Structured logging with file rotation |</p>
+<p>| <strong>Redis + BullMQ</strong> | Background job queue for async AI tasks |</p>
+<p>| <strong>Anthropic Claude API</strong> | Primary AI engine (Sonnet + Haiku) |</p>
+<p>| <strong>Cloudinary</strong> | Featured image storage and CDN delivery |</p>
+<p>| <strong>Stripe</strong> | Subscription billing |</p>
+
+<h3>Architectural Layers</h3>
+
+<p>The platform follows a strict separation of concerns:</p>
+
+<pre><code>┌─────────────────────────────────────────────────┐
+<p>│  Presentation Layer (React SPA)                 │</p>
+<p>│  ├─ Public Landing                              │</p>
+<p>│  ├─ Auth Surface                                │</p>
+<p>│  ├─ Super Admin Panel                           │</p>
+<p>│  └─ User Panel (multi-tenant)                   │</p>
+<p>└─────────────────────────────────────────────────┘</p>
+<p>                      ↕</p>
+<p>┌─────────────────────────────────────────────────┐</p>
+<p>│  API Layer (Express REST + WebSocket)           │</p>
+<p>│  ├─ Routes → Controllers → Services             │</p>
+<p>│  ├─ Repositories → Models                       │</p>
+<p>│  ├─ Smart response handler (auto-pagination)    │</p>
+<p>│  └─ Role-based authorization middleware         │</p>
+<p>└─────────────────────────────────────────────────┘</p>
+<p>                      ↕</p>
+<p>┌─────────────────────────────────────────────────┐</p>
+<p>│  Data Layer (MongoDB)                           │</p>
+<p>│  ├─ Tenant-isolated collections                 │</p>
+<p>│  ├─ Workspace-scoped queries                    │</p>
+<p>│  └─ Audit trail for all critical actions        │</p>
+<p>└─────────────────────────────────────────────────┘</p>
+<p>                      ↕</p>
+<p>┌─────────────────────────────────────────────────┐</p>
+<p>│  AI Orchestration Layer                         │</p>
+<p>│  ├─ Research Agent → Web search + scraping      │</p>
+<p>│  ├─ Writing Agent → Claude Sonnet drafting      │</p>
+<p>│  ├─ SEO Agent → Meta, slug, FAQ generation      │</p>
+<p>│  ├─ Brand Voice Agent → Style profile matching  │</p>
+<p>│  └─ Quality Reviewer Agent → Fact-check         │</p>
+<p>└─────────────────────────────────────────────────┘</p>
+<p>                      ↕</p>
+<p>┌─────────────────────────────────────────────────┐</p>
+<p>│  External Integrations                          │</p>
+<p>│  ├─ CMS APIs (WordPress, Ghost, Contentful…)    │</p>
+<p>│  ├─ Search APIs (Brave Search, Exa)             │</p>
+<p>│  ├─ Scraping APIs (Firecrawl, Jina)             │</p>
+<p>│  └─ Stripe webhook handler                      │</p>
+<p>└─────────────────────────────────────────────────┘</code></pre></p>
+
+<h3>Multi-tenancy model</h3>
+
+<p>Every paying customer gets an isolated workspace. All article, brand voice, CMS connection, and team data is scoped by <code>workspaceId</code>. Tenants cannot access each other's data. The Super Admin can monitor across tenants but cannot create content within a tenant's workspace.</p>
+
+<hr/>
+
+<h2>5. Public-Facing Experience</h2>
+
+<h3>The Landing Page (`/`)</h3>
+
+<p>The landing page is the first impression for prospective customers. It has been designed as a single, scrollable experience with eleven distinct sections, each animated and responsive.</p>
+
+<h4>Section 1 — Navigation Bar</h4>
+<p>A fixed top navigation that begins fully transparent and gracefully transitions into a glass surface as the visitor scrolls. The logo on the left, navigation links in the center (Features, How It Works, Pricing, FAQ), and a theme toggle plus authentication buttons on the right. On mobile devices, the menu collapses into an animated slide-in drawer.</p>
+
+<h4>Section 2 — Hero Section</h4>
+<p>The opening visual statement. A large headline reading "Publish Smarter. Write with AI. Reach Further." appears with the middle line in a gradient blue-violet-teal. Behind the text, three large gradient orbs (blue, violet, teal) float in slow motion, creating depth without distraction. A pulsing announcement badge sits above the headline ("✦ Introducing AI-Powered Publishing — Now in Beta"). Below the subheading, two call-to-action buttons appear: a gradient "Start for Free" and a glass "Watch Demo." Five overlapping circular avatars below indicate "Trusted by 2,400+ publishers and agencies."</p>
+
+<p>The hero closes with a floating mockup of the actual product dashboard — a glass card showing an article being written, with live SEO score indicator, brand voice match percentage, and CMS publishing status. This mockup floats gently using subtle vertical animation.</p>
+
+<h4>Section 3 — Logo Marquee</h4>
+<p>An infinite scrolling row of supported integrations and tools: WordPress, Ghost, Notion, Contentful, Sanity, Anthropic, Claude, Brave Search, Firecrawl, DataForSEO, Cloudinary, Stripe. Two rows scroll in opposite directions with edge fade masks for visual polish.</p>
+
+<h4>Section 4 — Stats Section</h4>
+<p>Four key metrics displayed in glass cards with animated number counters that count up from zero when the section enters the viewport: 2.4M+ articles generated, 12,000+ publishers, 4.2 hours saved per article, 91/100 average SEO score.</p>
+
+<h4>Section 5 — Features Section</h4>
+<p>A 3×2 grid showcasing six core features, each in a glass card with hover lift and gradient border:</p>
+
+<ol><li>**Research Engine** — Search 20+ sources, summarize findings, generate source-backed briefs</li></ol>
+<ol><li>**AI Writing** (highlighted card spanning two rows) — Claude Sonnet drafts publication-ready articles</li></ol>
+<ol><li>**SEO Intelligence** — Auto-generated meta, slugs, FAQ schema, internal links</li></ol>
+<ol><li>**One-Click Publishing** — Direct integration with five major CMS platforms</li></ol>
+<ol><li>**Brand Voice** — AI trained on user's existing content</li></ol>
+<ol><li>**Team Collaboration** — Role-based workflows for agencies and newsrooms</li></ol>
+
+<h4>Section 6 — How It Works</h4>
+<p>A horizontal timeline of five steps connected by an animated gradient line: Research → Outline → Draft → SEO → Publish. Each step displays an icon, step number, title, and brief description. As the user scrolls, steps reveal sequentially.</p>
+
+<h4>Section 7 — Pricing Section</h4>
+<p>Four plan cards (Free, Starter, Pro, Agency) with a monthly/yearly toggle that animates the price values. The Starter plan is visually highlighted as "Most Popular" with a gradient border and elevated scale. Each card lists features with green check icons and ends with a plan-specific call-to-action.</p>
+
+<h4>Section 8 — Testimonials</h4>
+<p>Three customer testimonials displayed in glass cards with star ratings, quote icons, and author attributions including name, role, and company.</p>
+
+<h4>Section 9 — Call-to-Action Section</h4>
+<p>A full-width gradient-overlay section with a large headline, supporting text, two buttons, and animated background orbs. Designed to be a high-conversion moment near the end of the page.</p>
+
+<h4>Section 10 — FAQ Section</h4>
+<p>Eight frequently asked questions inside a glass card using an accordion component with smooth open/close animations. Covers CMS support, API key requirements, brand voice training, plan limits, security, and team usage.</p>
+
+<h4>Section 11 — Footer</h4>
+<p>A four-column footer with brand information, product links, company links, and legal/support links. A bottom bar displays copyright and a decorative tagline.</p>
+
+<hr/>
+
+<h2>6. Authentication System</h2>
+
+<h3>Login & Registration (`/auth/login` and `/auth/register`)</h3>
+
+<p>Authentication uses a unified tab-based interface. Users see a single page with two tabs (Sign In / Sign Up) that swap content with smooth Framer Motion transitions. Switching tabs updates the URL so deep links continue to work.</p>
+
+<p>The page is split into two halves on desktop:</p>
+<ul><li>**Left panel:** Marketing showcase with a headline, three feature highlights with icons, and a customer testimonial</li></ul>
+<ul><li>**Right panel:** The active form inside a glass card with violet glow and gradient border accent</li></ul>
+
+<p>On mobile, only the right panel is shown to maximize form usability.</p>
+
+<h3>Demo Login System</h3>
+
+<p>Above the regular login form, two prominent glass cards offer one-click demo access:</p>
+
+<p>| Card | What it does |</p>
+<p>|---|---|</p>
+<p>| <strong>Super Admin</strong> | Logs the visitor in as Alex Morgan (admin role), redirects to <code>/admin/dashboard</code> |</p>
+<p>| <strong>Publisher</strong> | Logs the visitor in as Sarah Chen (user role), redirects to <code>/dashboard</code> |</p>
+
+<p>Each card shows a gradient-stripe accent on the left edge, an icon, label, and description. A pulse animation runs while the demo is being prepared. This system allows prospects (and the client during this proposal review) to instantly experience either panel without account creation.</p>
+
+<h3>Form Validation</h3>
+
+<p>Every authentication form uses React Hook Form combined with Zod schemas:</p>
+<ul><li>**Login:** Email format, password minimum 6 characters</li></ul>
+<ul><li>**Register:** Name required, valid email, 8-character password with strength meter showing 4 levels (Weak, Fair, Good, Strong), password confirmation matching, terms acceptance</li></ul>
+<ul><li>**Forgot password:** Single email input → animated success state with "Check your inbox"</li></ul>
+<ul><li>**Reset password:** New password + confirmation with validation, success state with countdown redirect</li></ul>
+
+<h3>Security features</h3>
+
+<ul><li>HTTP-only cookies for refresh tokens (CSRF resistance)</li></ul>
+<ul><li>Bcrypt hashing with 12 salt rounds</li></ul>
+<ul><li>JWT access tokens (15 minutes) + refresh tokens (7 days) with automatic renewal</li></ul>
+<ul><li>Rate limiting on all auth endpoints (5 attempts per 15 minutes for login)</li></ul>
+<ul><li>Email verification flow ready for activation</li></ul>
+
+<hr/>
+
+<h2>7. Super Admin Panel — Complete Walkthrough</h2>
+
+<p>The Super Admin Panel is the platform owner's command center. All routes are prefixed with <code>/admin/</code>, protected by role-based access control. Only users with the <code>SuperAdmin</code> role can access these routes.</p>
+
+<h3>Layout Architecture</h3>
+
+<p>A persistent left sidebar (collapsible to icon-only mode), a top bar with search, notifications, theme toggle, and profile dropdown, and a main content area with smooth page transitions. A bottom footer shows platform version, system operational status, and a support link. On mobile, the sidebar becomes an overlay drawer accessible via a hamburger button.</p>
+
+<h3>Page 1 — Admin Dashboard (`/admin/dashboard`)</h3>
+
+<p>The overview hub of the entire platform.</p>
+
+<strong>Top section:</strong> Four KPI cards displaying:
+<ul><li>Total users (with month-over-month trend)</li></ul>
+<ul><li>Active subscriptions</li></ul>
+<ul><li>Articles generated platform-wide</li></ul>
+<ul><li>Monthly Recurring Revenue (MRR)</li></ul>
+
+<p>Each card uses an animated counter, an icon in a gradient square, and a green/red trend pill showing the percentage change.</p>
+
+<strong>Charts row:</strong>
+<ul><li>Revenue trend (last 6 months) — area chart with violet gradient fill</li></ul>
+<ul><li>Plan distribution — donut chart showing Free / Starter / Pro / Agency split</li></ul>
+<ul><li>New users (last 30 days) — line chart</li></ul>
+<ul><li>Articles per day (last 14 days) — bar chart</li></ul>
+
+<strong>Lower section:</strong>
+<ul><li>Recent signups list (last 6 users with avatars, plan badges, dates)</li></ul>
+<ul><li>Recent articles list (cross-tenant, with status badges)</li></ul>
+<ul><li>Failed payments alert card (red border, list of overdue accounts with retry buttons)</li></ul>
+
+<h3>Page 2 — Users Management (`/admin/users`)</h3>
+
+<p>The Super Admin's interface to monitor and manage every paying customer (tenant) on the platform.</p>
+
+<strong>Top stats:</strong> Four small KPI cards (Total users, Active, Suspended, Paying customers).
+
+<strong>Filter bar:</strong> Live search input, plan filter dropdown (All / Free / Starter / Pro / Agency), status filter (All / Active / Suspended), and a reset button.
+
+<strong>Data table:</strong> Sortable columns including avatar with name and email, plan badge, article count, MRR contribution, status toggle, joined date, and an actions dropdown menu. The actions menu offers View detail, Reset password, Change plan, and Suspend/Activate (with destructive confirmation dialog).
+
+<p>The table supports pagination (10 rows per page), sortable headers (click to toggle ascending/descending), and clicking any row navigates to that user's detail page.</p>
+
+<h3>Page 3 — User Detail (`/admin/users/:id`)</h3>
+
+<p>A comprehensive view of a single tenant.</p>
+
+<strong>Header card:</strong> Large gradient avatar, user name, plan badge, status pill, email, join date, and action buttons (Reset password, Suspend/Activate).
+
+<strong>KPI row:</strong> Articles created, MRR, API calls in last 30 days, days active.
+
+<strong>Tabbed content area:</strong>
+<ul><li>**Overview tab:** Workspace details (workspace ID, member count, CMS connections, brand voices) plus a usage section with progress bars for articles, research queries, and storage</li></ul>
+<ul><li>**Articles tab:** Data table of all articles by this user with status, word count, CMS, and creation date</li></ul>
+<ul><li>**Subscription tab:** Current plan details, MRR, billing period dates, and a "Change plan" action</li></ul>
+<ul><li>**Audit logs tab:** All system actions related to this user with action codes, status pills (success/warning/error), timestamps, and IP addresses</li></ul>
+
+<h3>Page 4 — Plans Management (`/admin/plans`)</h3>
+
+<p>The pricing tier control center.</p>
+
+<p>Plan cards displayed in a 4-column grid (Free, Starter, Pro, Agency). Each card shows the plan name, description, monthly and yearly prices, full feature list with check icons, an Edit button, and a Delete button (with destructive confirmation).</p>
+
+<p>A "Create plan" button at the top opens a modal dialog with a complete form:</p>
+<ul><li>Plan name and slug</li></ul>
+<ul><li>Description</li></ul>
+<ul><li>Monthly and yearly pricing</li></ul>
+<ul><li>Feature list editor (add, remove, reorder features inline)</li></ul>
+<ul><li>"Highlight as featured" toggle (adds the gradient border and "Most Popular" badge)</li></ul>
+
+<p>This means the Super Admin can launch new pricing tiers without developer intervention.</p>
+
+<h3>Page 5 — Billing & Payments (`/admin/billing`)</h3>
+
+<p>Platform-wide financial operations.</p>
+
+<strong>Top KPIs:</strong> MRR, ARR (Annual Recurring Revenue), churn rate, failed payments count.
+
+<strong>Revenue chart:</strong> Area chart of last 6 months of net revenue from Stripe.
+
+<strong>Failed payments alert:</strong> A prominent red-bordered glass card listing all customers with overdue balances, displaying name, email, amount, attempt count, and a Retry button per row.
+
+<strong>Payment history table:</strong> Complete invoice list with invoice number, customer, plan, amount, status badge (Paid / Failed / Refunded), payment date, and payment method. Sortable, paginated, with a "Download all" CSV export action.
+
+<h3>Page 6 — Integrations (`/admin/integrations`)</h3>
+
+<p>Where the Super Admin configures all platform-wide third-party services.</p>
+
+<p>A grid of integration cards for each service:</p>
+<ol><li>**Anthropic** — Claude API key for AI generation</li></ol>
+<ol><li>**Brave Search** — Web research provider</li></ol>
+<ol><li>**Stripe** — Subscription billing</li></ol>
+<ol><li>**Email (SMTP/Resend)** — Transactional email delivery</li></ol>
+<ol><li>**Cloudinary** — Featured image hosting</li></ol>
+<ol><li>**DataForSEO** — Keyword analysis enrichment</li></ol>
+
+<p>Each card displays:</p>
+<ul><li>Service icon and name</li></ul>
+<ul><li>Connection status indicator (green check or red X)</li></ul>
+<ul><li>Masked key preview (e.g., `sk-ant-…7Q9c`)</li></ul>
+<ul><li>Last tested timestamp</li></ul>
+<ul><li>"Edit key" button (opens modal with masked input and show/hide toggle)</li></ul>
+<ul><li>"Test" button (runs a live test, shows toast with result)</li></ul>
+
+<h3>Page 7 — Content Monitor (`/admin/content`)</h3>
+
+<p>Cross-tenant article visibility for moderation and platform health monitoring.</p>
+
+<strong>Top stats:</strong> Total articles platform-wide, published count, draft count, failed count.
+
+<strong>Filter bar:</strong> Search by title or workspace, status filter, CMS platform filter, reset button.
+
+<strong>Articles table:</strong> Lists every article across every tenant, showing title and workspace and author, status badge, target CMS, word count, and creation timestamp. Each row has an actions dropdown with View on CMS, Flag for review, and Hide article (destructive).
+
+<p>This page protects the platform from abuse: spam content, policy violations, broken articles can be detected and acted upon centrally.</p>
+
+<h3>Page 8 — Analytics (`/admin/analytics`)</h3>
+
+<p>Platform-wide engagement and growth metrics.</p>
+
+<strong>Date range selector:</strong> Switch between 7 days, 30 days, 90 days, or 1 year.
+
+<strong>KPI row:</strong> Monthly Active Users, Daily Active Users, Articles per day, Average platform SEO score.
+
+<strong>Charts:</strong>
+<ul><li>User growth (line chart) — daily new signups</li></ul>
+<ul><li>Articles per day (bar chart) — output across all tenants</li></ul>
+<ul><li>Revenue trend (area chart) — 6-month financial picture</li></ul>
+<ul><li>Plan distribution (donut)</li></ul>
+
+<strong>Top tenants leaderboard:</strong> A horizontal bar list of the five tenants generating the most articles, with their workspace name and article count.
+
+<h3>Page 9 — Notifications / Broadcasts (`/admin/notifications`)</h3>
+
+<p>The platform-wide announcement system.</p>
+
+<strong>Composer card</strong> (left, taking 2/3 width):
+<ul><li>Subject input</li></ul>
+<ul><li>Body textarea (Markdown supported)</li></ul>
+<ul><li>Audience selector dropdown (All users, Paying customers, Pro + Agency, Free plan only)</li></ul>
+<ul><li>Schedule date-time input (optional)</li></ul>
+<ul><li>Recipient count display ("Will reach 12,483 recipients")</li></ul>
+<ul><li>Save draft and Send buttons</li></ul>
+
+<strong>Best practices card</strong> (right, taking 1/3 width): Four UX tips for high-engagement broadcasts.
+
+<strong>Broadcast history table</strong> below: All previous announcements with subject, audience, recipient count, sent timestamp, and open rate percentage.
+
+<h3>Page 10 — Platform Settings (`/admin/settings`)</h3>
+
+<p>Five tabs for global configuration:</p>
+
+<ol><li>**General:** Platform name, tagline, support email, default user timezone</li></ol>
+<ol><li>**Branding:** Logo upload (light + dark backgrounds), favicon, primary brand color</li></ol>
+<ol><li>**Email:** SMTP host, port, credentials, from address, from name, plus a "Send test email" button</li></ol>
+<ol><li>**Maintenance:** Toggle to enable maintenance mode (shows maintenance page to all non-admin users), customizable maintenance message</li></ol>
+<ol><li>**Feature flags:** Granular toggles for individual platform features (real-time streaming, version history, team collaboration, Ghost integration, social repurposing)</li></ol>
+
+<h3>Page 11 — Audit Logs (`/admin/logs`)</h3>
+
+<p>Compliance and forensic visibility.</p>
+
+<strong>Filter bar:</strong> Search across actions/actors/targets, status filter (Success / Warning / Error), actor filter (Admin / System).
+
+<strong>Timeline view:</strong> All privileged actions displayed as a vertical timeline with a gradient connecting line. Each entry shows an icon, action code in monospace formatting, status pill, target description, actor identification, timestamp, and source IP address.
+
+<strong>Export CSV button:</strong> For compliance audits or external review.
+
+<h3>Page 12 — Support Tickets (`/admin/support`)</h3>
+
+<p>Help desk management.</p>
+
+<strong>KPIs:</strong> All tickets, Open, Pending reply, Closed.
+
+<strong>Filter bar:</strong> Search by subject or email, status filter, priority filter.
+
+<strong>Tickets table:</strong> Subject and submitter, priority badge (high/medium/low), status badge (open/pending/closed), reply count, last update timestamp.
+
+<strong>Ticket detail dialog:</strong> Clicking any row opens a modal showing the full thread (alternating user and admin messages with timestamps), a reply textarea, and action buttons (Mark as pending, Close ticket, Send reply).
+
+<hr/>
+
+<h2>8. User Panel — Complete Walkthrough</h2>
+
+<p>The User Panel is where paying customers (tenants) actually use the platform. All routes are prefixed with <code>/dashboard/</code>. Multi-tenant isolation ensures each user sees only their own workspace data.</p>
+
+<h3>Layout Architecture</h3>
+
+<p>Identical structure to Super Admin: collapsible sidebar, top bar, main content, footer. The sidebar shows tenant-specific navigation grouped into Workspace, Tools, and Account sections. The top bar includes a credits-remaining pill (e.g., "47/200 articles") that warns when nearing plan limit.</p>
+
+<h3>Page 1 — User Dashboard (`/dashboard`)</h3>
+
+<p>The workspace home page.</p>
+
+<strong>Greeting:</strong> Personalized header with the user's name and a "New article" button as the primary call-to-action.
+
+<strong>KPI row:</strong> Articles this month, hours saved, average SEO score, credits remaining (with low warning if under 20%).
+
+<strong>Usage card:</strong> Three progress bars for articles, research queries, and storage with a "Manage plan" link.
+
+<strong>Two-column section:</strong>
+<ul><li>**Left (recent articles):** Last 5 articles with title, word count, CMS, status badge, view count for published items</li></ul>
+<ul><li>**Right (quick actions + tip):** A 2×2 grid of links to Research, SEO Tools, CMS, and Brand Voice; below, a teal-bordered tip card suggesting Brand Voice setup</li></ul>
+
+<strong>Activity chart:</strong> A bar chart showing articles created in the last 14 days.
+
+<h3>Page 2 — New Article (5-Step Wizard) — `/dashboard/new-article`</h3>
+
+<p>The flagship feature. A guided wizard that walks the user from idea to published article.</p>
+
+<strong>Wizard stepper:</strong> Five circles connected by an animated gradient progress line. Each step has a label (Research, Outline, Draft, SEO, Publish) and hint. Completed steps show a checkmark, the active step has a glowing ring, future steps are dim.
+
+<strong>Step 1 — Research:</strong>
+<p>The user enters a topic, target keyword, and selects search depth (Quick — 3 sources, Deep — 10 sources, Comprehensive — 20 sources). Clicking "Search sources" triggers the AI Research Agent, which populates a list of source cards. Each source card displays:</p>
+<ul><li>Title and domain</li></ul>
+<ul><li>Publication date and reading time</li></ul>
+<ul><li>Relevance score (color-coded badge: green for 90+, blue for 80-89, amber below)</li></ul>
+<ul><li>Two-line summary</li></ul>
+<ul><li>"Open source" external link</li></ul>
+<ul><li>Selection checkbox</li></ul>
+
+<p>A right-side panel shows selected sources count and a "Generate brief" button. Clicking generates a structured research brief (thesis statement, key facts, open questions) that becomes the foundation for the article.</p>
+
+<strong>Step 2 — Outline:</strong>
+<p>The AI Writing Agent generates a structured outline based on the brief. The user sees a list of sections (introduction, numbered body sections, conclusion) that can be:</p>
+<ul><li>Reordered with up/down arrows</li></ul>
+<ul><li>Renamed by editing inline</li></ul>
+<ul><li>Removed individually</li></ul>
+<ul><li>New sections added</li></ul>
+
+<p>A right-side panel offers target word count selector (500, 1000, 1500, 2000, 3000) and writing tone selector (Professional, Casual, Journalistic, Academic). Clicking "Generate draft" sends the outline + brief + tone to Claude Sonnet for full article generation.</p>
+
+<strong>Step 3 — Draft Editor:</strong>
+<p>A rich text editor occupies the main column. The toolbar at the top includes formatting controls (bold, italic, underline, headings, lists, quotes, code, links) and an inline AI toolbar with five powerful actions: Rewrite selection, Improve clarity, Expand paragraph, Shorten paragraph, Fix grammar.</p>
+
+<p>A right sidebar shows live statistics: word count, reading time, Flesch readability score, paragraph count. Below it, an auto-save indicator pulses green ("Saved 4s ago"), confirming changes are persistent. Version history is accessible from a separate panel showing all auto-save snapshots with timestamps and user/AI attribution.</p>
+
+<strong>Step 4 — SEO Optimization:</strong>
+<p>Three primary panels:</p>
+
+<ul><li>**SEO Score Ring:** A large animated SVG ring displaying the current score (0-100) that smoothly fills in. Color shifts: amber below 70, gradient blue-violet for 70-89, green-teal for 90+.</li></ul>
+<ul><li>**Checklist:** Ten SEO checks (keyword density, keyword in introduction, meta title length, meta description length, heading hierarchy, internal links, external authority links, alt text, FAQ schema, freshness signals) each with pass (green check) or warning (amber exclamation) icons.</li></ul>
+<ul><li>**Meta Title Options:** Three AI-generated options with character counts, click any to select. Editable field for custom override.</li></ul>
+<ul><li>**Generated FAQ:** Four questions with answers, ready to inject as schema markup. Copy as JSON-LD button.</li></ul>
+<ul><li>**Internal Links:** Suggestions based on the user's existing published articles, each with title, slug, and recommended anchor text.</li></ul>
+
+<strong>Step 5 — Publish:</strong>
+<p>The final step. A two-column layout:</p>
+
+<ul><li>**Left column (publishing controls):**</li></ul>
+<p>  - CMS picker dropdown (lists only connected CMS accounts)</p>
+<p>  - Publish mode (3 cards): Draft / Publish now / Schedule</p>
+<p>  - If Schedule is selected, a date-time picker appears</p>
+<p>  - Featured image upload zone (drag-and-drop or click to browse)</p>
+
+<ul><li>**Right column (pre-publish checklist):**</li></ul>
+<p>  - SEO score above 80 ✓</p>
+<p>  - Meta title set ✓</p>
+<p>  - Meta description set ✓</p>
+<p>  - Featured image set (warning if missing)</p>
+<p>  - Word count > 1,000 ✓</p>
+<p>  - X/5 checks passed counter</p>
+
+<p>Below the checklist, a large gradient "Publish now" / "Save as draft" / "Schedule publish" button (label changes based on mode). Clicking it triggers the CMS Agent which posts the complete article to the selected CMS via official API.</p>
+
+<h3>Page 3 — My Articles (`/dashboard/articles`)</h3>
+
+<p>A complete inventory of the user's content.</p>
+
+<strong>Status tabs:</strong> All / Drafts / Scheduled / Published / Failed, each showing a count.
+
+<strong>Filter bar:</strong> Search by title, CMS filter dropdown, view toggle (Grid / Table).
+
+<strong>Grid view:</strong> Card-based with thumbnail, status badge, CMS tag, title, two-line tag list, footer stats (word count, reading time, view count for published), and an actions menu.
+
+<strong>Table view:</strong> Sortable data table with columns for title, status, CMS, words, SEO score, views, last updated, and actions.
+
+<p>Each row's action menu offers: Edit, Duplicate (creates a new draft copy), View on CMS (opens the live URL for published items), Delete (with confirmation).</p>
+
+<h3>Page 4 — Article Detail (`/dashboard/articles/:id`)</h3>
+
+<p>The full editing surface for a specific article.</p>
+
+<strong>Header card:</strong> Status badge, CMS tag, all article tags, title, and stats line (word count, reading time, SEO score, view count for published, last updated). Action buttons on the right: AI Improve, Publish/Update.
+
+<strong>Four tabs:</strong>
+<ul><li>**Editor tab:** Full editor with toolbar, title input, content textarea, sidebar with stats, auto-save indicator, and AI tools quick-access list</li></ul>
+<ul><li>**SEO tab:** SEO score ring, complete checklist, three meta title options, generated FAQ, internal link suggestions</li></ul>
+<ul><li>**Versions tab:** Vertical timeline of all version history entries with restore buttons (current version is non-restorable)</li></ul>
+<ul><li>**Performance tab:** For published articles only — total views, SEO score, average time on page, traffic sources breakdown bars</li></ul>
+
+<h3>Page 5 — Research Hub (`/dashboard/research`)</h3>
+
+<p>Standalone research tool, decoupled from article creation.</p>
+
+<strong>Input panel:</strong> Topic, target keyword, depth selector, search button (with loading spinner state).
+
+<strong>Results layout:</strong> Two-column when sources arrive:
+<ul><li>**Left (2/3 width):** Scrollable list of source cards with selection checkboxes</li></ul>
+<ul><li>**Right (1/3 width):** Sticky panel showing selected source count and "Generate brief" button</li></ul>
+
+<strong>Brief output:</strong> When generated, appears below as a glass card with teal glow, displaying thesis, key facts list (with lightning icons), and open questions list. Two action buttons: Save brief or Use in new article (jumps to wizard).
+
+<p>This page allows users to do research-only sessions for content planning, then convert briefs into articles later.</p>
+
+<h3>Page 6 — SEO Tools (`/dashboard/seo`)</h3>
+
+<p>A standalone SEO toolkit with four tabs:</p>
+
+<ol><li>**Meta Generator:** Paste a title or topic → AI generates 3 meta title variants and 2 meta description variants, each with character counts and copy buttons</li></ol>
+<ol><li>**Slug Generator:** Title input → primary slug + 2 alternative slugs with descriptive labels (Long-form, Compact)</li></ol>
+<ol><li>**FAQ Generator:** Paste article content → generates 4 schema-ready FAQ pairs with a "Copy schema" JSON-LD export button</li></ol>
+<ol><li>**Keyword Analyzer:** Keyword input → returns search volume, difficulty score (color-coded), CPC, intent classification, and 5 related keyword suggestions, each with their own "Analyze" button for chained research</li></ol>
+
+<h3>Page 7 — CMS Connections (`/dashboard/cms`)</h3>
+
+<p>Where users connect and manage their target publishing destinations.</p>
+
+<p>A 3-column grid of CMS cards: WordPress, Ghost, Notion, Contentful, Sanity. Each card shows:</p>
+<ul><li>Platform icon with brand-colored gradient</li></ul>
+<ul><li>Platform name and phase badge (Phase 1 MVP / Phase 2 / Phase 3)</li></ul>
+<ul><li>Connection status (green check / dim X)</li></ul>
+<ul><li>Site URL (or "—" if disconnected)</li></ul>
+<ul><li>Authentication method</li></ul>
+<ul><li>Last sync timestamp</li></ul>
+<ul><li>Action buttons: Test, Set as Default, Disconnect (for connected) or Connect (for disconnected)</li></ul>
+
+<p>The default CMS gets a star indicator and a primary ring border. New articles auto-target the default unless changed in the wizard.</p>
+
+<strong>Add connection dialog:</strong> Platform dropdown, site URL input, credentials input (label changes per platform: "Application Password" for WordPress, "Admin API Key" for Ghost, "API Token" for others). Connect button validates and saves.
+
+<h3>Page 8 — Brand Voice (`/dashboard/brand-voice`)</h3>
+
+<p>The differentiating feature.</p>
+
+<strong>Active voice highlight card</strong> (top): A large prominent glass card with violet glow showing the currently active voice profile. Displays:
+<ul><li>Name and "Active" badge</li></ul>
+<ul><li>Description</li></ul>
+<ul><li>Tone badges (Professional, Confident, Concise, etc.)</li></ul>
+<ul><li>Sample signature phrases (e.g., "Here's what matters", "The bottom line is")</li></ul>
+<ul><li>Stats: sample article count, average sentence length, last used date</li></ul>
+
+<strong>All profiles grid:</strong> Card layout for every voice profile the user has created. Each card shows similar information at smaller scale, with a "Set active" button (or "Active" disabled state) and edit/delete icons.
+
+<strong>New voice profile dialog:</strong> Name input + drag-and-drop upload zone for 3-5 sample articles (TXT, DOCX, or pasted URLs). The Brand Voice Agent then analyzes tone, vocabulary, sentence rhythm, and characteristic phrases to build the profile.
+
+<h3>Page 9 — Templates (`/dashboard/templates`)</h3>
+
+<p>Reusable article structures.</p>
+
+<p>A 3-column grid of template cards. Six built-in templates ship by default: Listicle (Top 10), How-to Guide, Product Comparison, News Roundup, Case Study, Trend Analysis. Each card shows:</p>
+<ul><li>Icon and category badge</li></ul>
+<ul><li>Name</li></ul>
+<ul><li>Description / prompt</li></ul>
+<ul><li>Stats line (target word count, use count, last used)</li></ul>
+<ul><li>"Use template" gradient button (jumps to article wizard pre-filled)</li></ul>
+<ul><li>Edit and delete icons</li></ul>
+
+<strong>Custom template creation dialog:</strong> Name, category, description with prompt structure, target word count.
+
+<h3>Page 10 — Analytics (`/dashboard/analytics`)</h3>
+
+<p>Article performance metrics for the user's own content.</p>
+
+<strong>Date range selector:</strong> 7 / 30 / 90 days.
+
+<strong>KPI row:</strong> Total views, average SEO score, published count, top performer (with view count).
+
+<strong>Charts:</strong>
+<ul><li>Views over time (large area chart on left, taking 2/3)</li></ul>
+<ul><li>Traffic sources (donut on right, showing Organic Search, Direct, Social, Referral, Email)</li></ul>
+
+<strong>Top performing articles table:</strong> Sortable list of all published articles ranked by views, showing title, status, view count, SEO score, word count, and publish date.
+
+<h3>Page 11 — Team (`/dashboard/team`)</h3>
+
+<p>Multi-user collaboration (Pro / Agency plans).</p>
+
+<strong>Members section:</strong> List of all current team members with avatar, name and email, article count, join date, role dropdown (Owner is locked, others can change between Editor / Writer / Viewer), and a remove icon (with confirmation).
+
+<strong>Pending invitations section:</strong> Any unaccepted invites with email, role, sent timestamp, resend, and cancel buttons.
+
+<strong>Role permissions card:</strong> A 4-column reference showing what each role can do (Owner: full access, Editor: create/publish/manage all, Writer: own articles only with submit-for-review workflow, Viewer: read-only).
+
+<strong>Invite dialog:</strong> Email input + role selector. Sends an invitation email with a join link.
+
+<h3>Page 12 — API Keys (`/dashboard/api-keys`)</h3>
+
+<p>Two-section page.</p>
+
+<strong>Provider Keys (Overrides) section:</strong> Three cards for Anthropic, Brave Search, OpenAI. Each shows description, connection status, masked key preview, and a "Connect" or "Update" button. When a user provides their own API keys, AI generation costs are billed directly to their provider account, bypassing the platform's monthly limit.
+
+<strong>Personal API Keys section:</strong> A "Create key" button at the top opens a dialog asking for key name and scope (All endpoints / Read only / Articles + Research). On creation, the full key is shown once in an emerald success card with a Copy button. The key is then stored in a table showing name, masked key, scope, creation date, last used, and a revoke action.
+
+<p>These personal keys allow developers to build custom integrations: bulk import scripts, Notion-to-Newsroom MCP automation, mobile apps, browser extensions, or Zapier/Make/n8n workflows.</p>
+
+<h3>Page 13 — Billing (`/dashboard/billing`)</h3>
+
+<p>Personal plan and payment management.</p>
+
+<strong>Top section</strong> (3-column):
+<ul><li>**Current plan card** (2 columns): Plan name in gradient text, monthly price, renewal date, four usage progress bars (articles, research queries, storage, team members), action buttons (Cancel subscription, Switch to yearly)</li></ul>
+<ul><li>**Payment method card** (1 column): Card brand and last four digits, expiry, "Update card" button</li></ul>
+
+<strong>Plan comparison section:</strong> All four plans displayed with monthly/yearly toggle, feature lists, and contextual buttons ("Current plan" disabled for active, "Upgrade"/"Downgrade" gradient buttons for others).
+
+<strong>Invoice history table:</strong> All past invoices with number, date, plan, amount, status badge, payment method, and download icon.
+
+<h3>Page 14 — Settings (`/dashboard/settings`)</h3>
+
+<p>Personal preferences across four tabs:</p>
+
+<ol><li>**Profile:** Avatar upload (with size guidance), full name, email, timezone selector, language selector</li></ol>
+<ol><li>**Security:** Change password form (current + new + confirm), Two-factor authentication toggle, active sessions list with revoke buttons for non-current sessions</li></ol>
+<ol><li>**Notifications:** Seven event types (Article published, Article generation complete, Team member invited, Payment received, Plan limit approaching, Platform announcements, Weekly digest) each with separate Email and In-app toggles</li></ol>
+<ol><li>**Workspace:** Workspace name, default brand voice selector, default CMS selector, default article length</li></ol>
+
+<h3>Page 15 — Support (`/dashboard/support`)</h3>
+
+<p>Help desk for tenant issues.</p>
+
+<strong>Top KPIs:</strong> Open, Pending reply, Resolved counts.
+
+<strong>My tickets table:</strong> All tickets the user has submitted with subject, priority badge, status badge, reply count, last updated.
+
+<strong>FAQ accordion:</strong> Six common questions answered (CMS connection, article editing, plan limits, brand voice training, security, cancellation).
+
+<strong>New ticket dialog:</strong> Subject, priority selector, description textarea.
+
+
+
+<hr/>
+
+<h2>9. AI Agent Architecture</h2>
+
+<p>The Newsroom MCP system orchestrates <strong>seven specialized AI agents</strong> working together, each with a single clear responsibility. This design follows the agent pattern proven by Claude Agent SDK and the <a href="https://github.com/msitarzewski/agency-agents">agency-agents</a> reference architecture: each agent operates in an isolated context window, processes its specific input, and hands off structured output to the next stage. Isolation reduces token costs, simplifies debugging, enables parallel execution where possible, and allows individual agents to be swapped or upgraded independently.</p>
+
+<h3>Agent 1 — Research Agent</h3>
+
+<strong>Role:</strong> Source discovery and web content extraction.
+
+<strong>Inputs:</strong> Topic string, target keyword, search depth selector, optional date freshness constraint.
+
+<strong>Process:</strong>
+<ol><li>Calls Brave Search API (or Exa AI for semantic search) with the topic and keyword</li></ol>
+<ol><li>Receives top N results based on depth (3, 10, or 20)</li></ol>
+<ol><li>Filters out blacklisted domains, broken links, and low-relevance hits</li></ol>
+<ol><li>For each surviving URL, calls Firecrawl or Jina AI to scrape and convert the page to clean Markdown</li></ol>
+<ol><li>Computes a relevance score per source using semantic similarity to the topic</li></ol>
+<ol><li>Returns a structured array of source objects (title, URL, domain, summary, score, content, reading time)</li></ol>
+
+<strong>Model used:</strong> Claude Haiku 4.5 (for summarization of scraped content — fast and inexpensive).
+
+<strong>Why Haiku:</strong> Speed is critical at this stage, content is then handed to higher-quality agents. Haiku produces accurate summaries at one-fifth the cost of Sonnet.
+
+<h3>Agent 2 — Brief Generation Agent</h3>
+
+<strong>Role:</strong> Synthesize selected sources into a coherent research brief.
+
+<strong>Inputs:</strong> Array of selected sources from the user, topic, target keyword.
+
+<strong>Process:</strong>
+<ol><li>Compiles all selected source content</li></ol>
+<ol><li>Sends to Claude with a structured prompt requesting: thesis statement, key facts with citations, open questions</li></ol>
+<ol><li>Returns a structured brief object suitable for the next agent</li></ol>
+
+<strong>Model used:</strong> Claude Sonnet 4 (or DeepSeek R1 as a cost-effective alternative — reasoning quality required).
+
+<h3>Agent 3 — Outline Agent</h3>
+
+<strong>Role:</strong> Generate a structured article outline.
+
+<strong>Inputs:</strong> Research brief, target word count, writing tone.
+
+<strong>Process:</strong>
+<ol><li>Analyzes the brief to identify natural section breaks</li></ol>
+<ol><li>Generates 6-12 sections with descriptive headings and 2-3 bullet points each</li></ol>
+<ol><li>Allocates word counts per section to hit the target total</li></ol>
+<ol><li>Returns an editable outline structure that the user can drag, drop, rename, or remove</li></ol>
+
+<strong>Model used:</strong> Claude Haiku 4.5 (structured output is straightforward, no need for Sonnet).
+
+<h3>Agent 4 — Writing Agent</h3>
+
+<strong>Role:</strong> Produce the full article body.
+
+<strong>Inputs:</strong> Brief, outline, brand voice profile (active), target word count, writing tone.
+
+<strong>Process:</strong>
+<ol><li>Loads the active brand voice profile (tone, vocabulary, sentence rhythm)</li></ol>
+<ol><li>Sends a comprehensive prompt to Claude Sonnet including all context</li></ol>
+<ol><li>Streams the response token-by-token to the frontend via WebSocket so the user sees real-time progress</li></ol>
+<ol><li>Returns the complete article in Markdown format</li></ol>
+
+<strong>Model used:</strong> Claude Sonnet 4.
+
+<strong>Why Sonnet:</strong> Article body is the user-facing premium output. Quality directly impacts the platform's USP ("readers cannot tell it was AI generated"). Sonnet's superior coherence over long-form writing and natural editorial tone is essential.
+
+<h3>Agent 5 — SEO Agent</h3>
+
+<strong>Role:</strong> Generate all SEO assets.
+
+<strong>Inputs:</strong> Final article content, target keyword.
+
+<strong>Process:</strong>
+<ol><li>**Meta title:** Generates 3 options under 60 characters, each optimized for click-through rate</li></ol>
+<ol><li>**Meta description:** Generates 2 options under 160 characters with the keyword and a value proposition</li></ol>
+<ol><li>**URL slug:** Generates a primary slug plus 2 variants (long-form and compact)</li></ol>
+<ol><li>**FAQ section:** Identifies 4 likely user questions from the content and answers them concisely (schema-ready JSON-LD)</li></ol>
+<ol><li>**Internal links:** Queries the user's existing published articles in MongoDB, suggests relevant anchor placements</li></ol>
+<ol><li>**Tags and categories:** Suggests appropriate values for the connected CMS taxonomy</li></ol>
+<ol><li>**SEO score:** Runs a 10-point checklist (keyword density, intro placement, heading structure, image alt text, schema presence, etc.) and returns a 0-100 score</li></ol>
+
+<strong>Model used:</strong> Claude Haiku 4.5 (most SEO tasks are short, structured outputs).
+
+<h3>Agent 6 — Brand Voice Agent</h3>
+
+<strong>Role:</strong> Analyze sample articles and create or apply voice profiles.
+
+<strong>Two modes:</strong>
+
+<strong>Mode A — Training (when user uploads samples):</strong>
+<ol><li>Receives 3-5 sample articles</li></ol>
+<ol><li>Extracts tone descriptors (Professional, Casual, Witty, Authoritative)</li></ol>
+<ol><li>Computes vocabulary level (basic, intermediate, advanced)</li></ol>
+<ol><li>Calculates average sentence length and rhythm patterns</li></ol>
+<ol><li>Identifies signature phrases that recur across samples</li></ol>
+<ol><li>Saves as a Brand Voice profile in MongoDB</li></ol>
+
+<strong>Mode B — Application (during article generation):</strong>
+<ol><li>Loads the active profile when called by the Writing Agent</li></ol>
+<ol><li>Injects style guidance into the writing prompt as a system message</li></ol>
+<ol><li>Caches the profile prompt using Anthropic's prompt caching feature for cost efficiency</li></ol>
+
+<strong>Model used:</strong> Claude Sonnet 4 (style analysis and replication require deep model capability).
+
+<h3>Agent 7 — Quality Reviewer Agent</h3>
+
+<strong>Role:</strong> Pre-publish quality control.
+
+<strong>Inputs:</strong> Final article, brief, brand voice profile.
+
+<strong>Process:</strong>
+<ol><li>Identifies any factual claims and runs them against the source brief for support verification</li></ol>
+<ol><li>Detects unsupported claims and flags them for user review</li></ol>
+<ol><li>Checks for missing citations on quoted statistics</li></ol>
+<ol><li>Verifies brand voice match (returns a compatibility percentage)</li></ol>
+<ol><li>Identifies SEO gaps not caught by the SEO Agent</li></ol>
+<ol><li>Returns a structured pre-publish checklist</li></ol>
+
+<strong>Model used:</strong> Claude Haiku 4.5 (validation tasks are quick).
+
+<h3>Bonus Agent — CMS Publishing Agent</h3>
+
+<strong>Role:</strong> Push the finalized article to the target CMS.
+
+<strong>Process per platform:</strong>
+
+<ul><li>**WordPress REST API:** Authenticates with App Password, formats article in Gutenberg blocks, uploads featured image, sets categories, tags, slug, scheduling</li></ul>
+<ul><li>**Ghost Admin API:** Uses Mobiledoc or HTML format, handles tags and feature images</li></ul>
+<ul><li>**Contentful Management API:** Maps to the user's content model, creates entry with all fields</li></ul>
+<ul><li>**Sanity API:** Uses GROQ-compatible payload structure</li></ul>
+<ul><li>**Notion API:** Creates a page in the configured database with article content as blocks</li></ul>
+
+<p>This agent handles all CMS-specific quirks (auth flows, content format conversion, error handling) so the rest of the platform stays CMS-agnostic.</p>
+
+<h3>Agent orchestration</h3>
+
+<p>A central orchestrator service coordinates the agent flow:</p>
+
+<pre><code>User clicks "Generate" in wizard Step 2 (after sources selected)
+<p>      ↓</p>
+<p>Orchestrator queues a BullMQ job</p>
+<p>      ↓</p>
+<p>Worker picks up job, calls Brief Agent (Sonnet)</p>
+<p>      ↓</p>
+<p>Frontend receives "brief_generated" socket event</p>
+<p>      ↓</p>
+<p>User reviews brief, clicks Continue → Step 2 (Outline)</p>
+<p>      ↓</p>
+<p>Worker calls Outline Agent (Haiku)</p>
+<p>      ↓</p>
+<p>User edits outline, clicks "Generate Draft"</p>
+<p>      ↓</p>
+<p>Worker calls Writing Agent (Sonnet) → streams tokens to frontend</p>
+<p>      ↓</p>
+<p>User reviews draft, jumps to SEO step</p>
+<p>      ↓</p>
+<p>Worker calls SEO Agent (Haiku) → returns all SEO assets</p>
+<p>      ↓</p>
+<p>User reviews, clicks Publish</p>
+<p>      ↓</p>
+<p>Worker calls CMS Publishing Agent → posts to target CMS</p>
+<p>      ↓</p>
+<p>Article saved with cmsPostId, status updated to "published"</code></pre></p>
+
+<p>Each agent's input, output, model used, token usage, and cost is logged for billing reconciliation and platform analytics.</p>
+
+<hr/>
+
+<h2>10. End-to-End Workflows</h2>
+
+<h3>Workflow A — Solo blogger writes a weekly post</h3>
+
+<ol><li>**Sarah** logs into `/dashboard` using her Pro plan account</li></ol>
+<ol><li>Dashboard shows her remaining credits (47 of 200), recent articles, and quick action tiles</li></ol>
+<ol><li>She clicks "New article" — the wizard opens</li></ol>
+<ol><li>**Step 1:** Types "AI productivity tools 2026", selects Deep search depth, clicks Search</li></ol>
+<ol><li>The Research Agent runs; 10 source cards appear within 8 seconds</li></ol>
+<ol><li>She unchecks 3 sources that look like SEO spam, keeps 7, clicks Generate brief</li></ol>
+<ol><li>The Brief Agent produces a thesis with 6 key facts and 3 open questions</li></ol>
+<ol><li>**Step 2:** AI generates an outline with 9 sections; she reorders two sections, deletes one, sets word count to 1,500, picks "Casual" tone, clicks Generate draft</li></ol>
+<ol><li>**Step 3:** Article body streams in over 25 seconds. She reads through, uses "Improve clarity" on one paragraph that felt stiff, expands one paragraph that was too short</li></ol>
+<ol><li>**Step 4:** SEO score arrives at 87/100. She picks meta title option 2, accepts the AI-generated FAQ, ignores internal links suggestions for now</li></ol>
+<ol><li>**Step 5:** Selects her connected WordPress site, picks Schedule mode, sets publish for Monday 9am, drags in a featured image from her desktop, sees pre-publish checklist all green except featured image (now satisfied), clicks Schedule publish</li></ol>
+<ol><li>Toast confirms scheduled. Article appears in her Articles page with `scheduled` status badge</li></ol>
+<ol><li>Total time: 22 minutes</li></ol>
+
+<h3>Workflow B — Agency manages 5 client blogs</h3>
+
+<ol><li>**Priya** (agency owner) signs in, lands on dashboard</li></ol>
+<ol><li>She has 5 brand voice profiles set up — one per client</li></ol>
+<ol><li>New article needed for "Client A — Tech blog"</li></ol>
+<ol><li>Switches active brand voice to "Client A — Tech voice" in the topbar</li></ol>
+<ol><li>Goes to Templates, picks "Trend Analysis" (her custom template), clicks Use template</li></ol>
+<ol><li>Wizard opens pre-filled with template structure</li></ol>
+<ol><li>Completes wizard in 18 minutes (faster because outline came pre-structured)</li></ol>
+<ol><li>Publishes to Client A's WordPress site</li></ol>
+<ol><li>Switches brand voice to "Client B — Lifestyle voice"</li></ol>
+<ol><li>Repeats for next article</li></ol>
+<ol><li>Throughout the month, all team members (writers and editors) work in the same workspace with role-based permissions</li></ol>
+<ol><li>End of month, Priya checks Analytics across all client articles, exports report PDFs to share with each client</li></ol>
+
+<h3>Workflow C — Newsroom editorial review</h3>
+
+<ol><li>**Marcus** (writer) creates a draft article using the wizard</li></ol>
+<ol><li>Saves as draft instead of publishing</li></ol>
+<ol><li>Article appears in his Articles page</li></ol>
+<ol><li>**Editor** logs in, sees Marcus's article in the team workspace under "Drafts"</li></ol>
+<ol><li>Editor opens the article, uses AI tools to improve sections, fact-checks via the Quality Reviewer Agent</li></ol>
+<ol><li>Editor publishes the article directly to the CMS</li></ol>
+<ol><li>Audit log records: Writer created, Editor edited, Editor published, with timestamps</li></ol>
+
+<h3>Workflow D — Super Admin response to abuse</h3>
+
+<ol><li>**Alex** (Super Admin) receives a notification: a tenant has generated 50 articles in 2 hours (suspicious volume)</li></ol>
+<ol><li>Logs into `/admin/dashboard`, sees the alert in notifications</li></ol>
+<ol><li>Goes to `/admin/users`, sorts by "Articles" descending, finds the offender</li></ol>
+<ol><li>Clicks user → sees their articles tab</li></ol>
+<ol><li>Clicks one article on Content Monitor — it's spam content</li></ol>
+<ol><li>Returns to user detail, suspends the account</li></ol>
+<ol><li>Confirmation dialog requires destructive action acknowledgment</li></ol>
+<ol><li>Suspension immediately revokes the user's session via Socket.io disconnect event</li></ol>
+<ol><li>Audit log captures the suspension with Alex as actor</li></ol>
+
+<h3>Workflow E — Brand voice training (Pro plan unlock)</h3>
+
+<ol><li>New Pro plan customer, **Diego**, just upgraded</li></ol>
+<ol><li>Goes to `/dashboard/brand-voice`, clicks "New voice profile"</li></ol>
+<ol><li>Names it "MediaHaus Editorial"</li></ol>
+<ol><li>Drags 4 of his previous articles into the upload zone</li></ol>
+<ol><li>Brand Voice Agent processes the samples (~30 seconds with progress indicator)</li></ol>
+<ol><li>Profile saves with extracted tone (Professional, Confident), avg sentence length (16 words), 5 signature phrases</li></ol>
+<ol><li>Diego sets it as active</li></ol>
+<ol><li>His next 50 articles all sound consistently like MediaHaus</li></ol>
+
+<hr/>
+
+<h2>11. Security, Privacy & Compliance</h2>
+
+<h3>Authentication security</h3>
+
+<p>| Feature | Implementation |</p>
+<p>|---|---|</p>
+<p>| Password hashing | bcrypt with 12 salt rounds |</p>
+<p>| Session management | JWT access tokens (15 min) + refresh tokens (7 days) |</p>
+<p>| Token storage | HTTP-only cookies, sameSite=strict |</p>
+<p>| CSRF protection | SameSite cookie + origin verification |</p>
+<p>| Rate limiting | 5 attempts per 15 min on login, OTP verification, password reset |</p>
+<p>| Email verification | OTP with 10-minute expiry |</p>
+<p>| Two-factor authentication | TOTP support (toggleable per user) |</p>
+
+<h3>Data protection</h3>
+
+<p>| Concern | Solution |</p>
+<p>|---|---|</p>
+<p>| CMS credentials at rest | AES-256-GCM encryption per workspace |</p>
+<p>| API key storage | Hashed before save, masked in UI (only last 4 chars visible) |</p>
+<p>| Personal API keys | Shown once on creation, revocable any time |</p>
+<p>| Database access | Mongoose query isolation, all queries scoped by workspaceId |</p>
+<p>| Multi-tenant data leak | Service layer enforces workspace boundaries on every read/write |</p>
+
+<h3>Compliance</h3>
+
+<p>| Standard | Status |</p>
+<p>|---|---|</p>
+<p>| GDPR — right to access | Data export endpoint planned |</p>
+<p>| GDPR — right to deletion | Account deletion with cascade |</p>
+<p>| SOC 2 Type I | In progress |</p>
+<p>| SOC 2 Type II | Audit planned for Q3 |</p>
+<p>| Audit logging | All admin and system actions logged with actor, target, timestamp, IP |</p>
+
+<h3>Network security</h3>
+
+<ul><li>HTTPS enforced (HSTS headers)</li></ul>
+<ul><li>Helmet middleware for security headers (CSP, X-Frame-Options, X-Content-Type-Options)</li></ul>
+<ul><li>CORS strictly whitelisted to known frontend origins</li></ul>
+<ul><li>HPP middleware against HTTP parameter pollution</li></ul>
+<ul><li>XSS sanitization on all user input</li></ul>
+<ul><li>NoSQL injection protection via Mongoose schema enforcement and key prefix sanitization</li></ul>
+
+<h3>AI safety</h3>
+
+<ul><li>All articles default to "save as draft" — never auto-publish without explicit user confirmation</li></ul>
+<ul><li>Quality Reviewer Agent flags unsupported claims before publish</li></ul>
+<ul><li>Action logging on every tool call (audit + cost tracking)</li></ul>
+<ul><li>Plan-based generation limits enforced server-side</li></ul>
+<ul><li>Output token caps prevent runaway costs</li></ul>
+
+<hr/>
+
+<h2>12. Pricing & Business Model</h2>
+
+<h3>Subscription tiers</h3>
+
+<p>| Plan | Monthly | Yearly (per month) | Articles/month | Team | CMS |</p>
+<p>|---|---|---|---|---|---|</p>
+<p>| <strong>Free</strong> | $0 | $0 | 10 | 1 user | WordPress only |</p>
+<p>| <strong>Starter</strong> | $19 | $15 | 50 | 1 user | WordPress + Ghost |</p>
+<p>| <strong>Pro</strong> | $49 | $39 | 200 | 5 users | All CMS platforms |</p>
+<p>| <strong>Agency</strong> | $99 | $79 | Unlimited | Unlimited | All CMS + White label |</p>
+
+<p>Yearly billing offers a 20% discount, payable upfront.</p>
+
+<h3>Plan-gated features</h3>
+
+<p>| Feature | Free | Starter | Pro | Agency |</p>
+<p>|---|---|---|---|---|</p>
+<p>| AI article generation | ✓ | ✓ | ✓ | ✓ |</p>
+<p>| Research engine | Basic | Full | Full | Full |</p>
+<p>| SEO tools | Basic | Full | Full | Full |</p>
+<p>| WordPress publishing | ✓ | ✓ | ✓ | ✓ |</p>
+<p>| Ghost publishing | — | ✓ | ✓ | ✓ |</p>
+<p>| Other CMS | — | — | ✓ | ✓ |</p>
+<p>| Brand voice profiles | — | — | ✓ | ✓ |</p>
+<p>| Templates (custom) | — | — | ✓ | ✓ |</p>
+<p>| Team collaboration | — | — | ✓ | ✓ |</p>
+<p>| Analytics dashboard | — | Basic | Full | Full |</p>
+<p>| White-label | — | — | — | ✓ |</p>
+<p>| Priority support | — | Email | Priority | Dedicated |</p>
+<p>| API access | — | 1 key | 5 keys | Unlimited |</p>
+
+<h3>AI cost economics (your perspective as platform owner)</h3>
+
+<p>Using Claude Sonnet 4 + Haiku 4.5 hybrid routing:</p>
+
+<ul><li>**Per article cost:** ~$0.12 (across all wizard steps)</li></ul>
+<ul><li>**Pro plan customer:** 200 articles × $0.12 = **$24/month AI cost**, against $49 revenue → **51% gross margin**</li></ul>
+<ul><li>**Agency customer:** Average 800 articles × $0.12 = **$96/month AI cost**, against $99 revenue → margin tightens, recommend caps or higher pricing for sustained heavy users</li></ul>
+
+<p>With prompt caching and batch API discount (50% off), the actual cost can drop another 30-40%, pushing margins to 65-70% on Pro tier.</p>
+
+<h3>Provider key override option</h3>
+
+<p>Users can plug their own Anthropic API key (or Brave Search, OpenAI keys) to bypass platform AI limits. When they do, AI costs route to their own account directly — beneficial for high-volume publishers and enterprise customers seeking direct vendor relationships. Their subscription still applies for platform features (dashboard, CMS integrations, brand voice training, etc.).</p>
+
+<h3>Revenue projections (year 1 conservative)</h3>
+
+<p>| Quarter | Free users | Paid users | MRR | Notes |</p>
+<p>|---|---|---|---|---|</p>
+<p>| Q1 (launch) | 200 | 20 | $400 | Beta phase, early adopters |</p>
+<p>| Q2 | 800 | 80 | $1,600 | Marketing kickoff |</p>
+<p>| Q3 | 2,000 | 200 | $4,200 | Word-of-mouth growth |</p>
+<p>| Q4 | 5,000 | 500 | $11,500 | Steady adoption |</p>
+
+<p>These are conservative estimates. Aggressive growth scenarios with content marketing investment can 3-5x these numbers.</p>
+
+<hr/>
+
+<h2>13. Project Delivery Status</h2>
+
+<h3>Frontend — 100% complete</h3>
+
+<p>Every page in both panels (Super Admin and User) is fully designed, animated, and demoable. The application includes:</p>
+
+<ul><li>33 fully styled pages</li></ul>
+<ul><li>50+ reusable components</li></ul>
+<ul><li>Complete design system with dark/light mode</li></ul>
+<ul><li>Full responsive layout (mobile, tablet, desktop, ultra-wide)</li></ul>
+<ul><li>Glassmorphism aesthetic with gradient color palette</li></ul>
+<ul><li>Framer Motion animations on every interaction</li></ul>
+<ul><li>Accessibility features (focus rings, reduced motion support, ARIA labels)</li></ul>
+<ul><li>Production-ready build (compiles cleanly, no warnings)</li></ul>
+
+<h3>Backend boilerplate — 100% complete</h3>
+
+<p>The backend foundation is production-ready with:</p>
+
+<ul><li>ES module architecture with path aliases</li></ul>
+<ul><li>Layered: routes → controllers → services → repositories → models</li></ul>
+<ul><li>Smart response handler with auto-detected pagination</li></ul>
+<ul><li>Smart pagination utility with search, filter, sort</li></ul>
+<ul><li>Authentication middleware with role-based authorization</li></ul>
+<ul><li>Global error handler with user-friendly messages</li></ul>
+<ul><li>Security middleware stack (helmet, CORS, HPP, XSS, NoSQL injection)</li></ul>
+<ul><li>Structured Winston logging with file rotation</li></ul>
+<ul><li>Rate limiting factories</li></ul>
+<ul><li>Email service (Resend, SMTP, dev preview)</li></ul>
+<ul><li>File upload (Multer with mime whitelist)</li></ul>
+<ul><li>Cloudinary integration helpers</li></ul>
+<ul><li>AES-256-GCM encryption for sensitive data</li></ul>
+<ul><li>JWT signing/verification (access + refresh)</li></ul>
+<ul><li>Bcrypt password hashing</li></ul>
+<ul><li>OTP generation and email</li></ul>
+<ul><li>Socket.io setup with user-socket mapping</li></ul>
+<ul><li>Cron job registry</li></ul>
+<ul><li>Init data seeders for roles and super admin</li></ul>
+<ul><li>Swagger documentation framework</li></ul>
+<ul><li>Health check endpoint with system metrics</li></ul>
+<ul><li>MongoDB connection with retry logic</li></ul>
+
+<h3>Next implementation phases</h3>
+
+<p>The remaining work follows the proven plan from the system design document:</p>
+
+<p>| Phase | Duration | Focus |</p>
+<p>|---|---|---|</p>
+<p>| Phase 1 — Backend core | 2 weeks | Mongoose models, auth API, user/workspace CRUD |</p>
+<p>| Phase 2 — AI agents | 3 weeks | Research, Brief, Outline, Writing, SEO, Brand Voice, Quality agents |</p>
+<p>| Phase 3 — CMS publishing | 2 weeks | WordPress integration first, then Ghost |</p>
+<p>| Phase 4 — Stripe billing | 1 week | Subscription, webhooks, plan enforcement |</p>
+<p>| Phase 5 — Polish + deploy | 2 weeks | Testing, error monitoring (Sentry), performance, production deploy |</p>
+<p>| Total to MVP launch | ~10 weeks | Frontend already done, this is backend + integration only |</p>
+
+<p>After MVP, additional CMS platforms (Contentful, Sanity, Notion) and advanced features (multilingual, social repurposing, analytics feedback) follow per the original system design roadmap.</p>
+
+<hr/>
+
+<h2>14. Demo Access</h2>
+
+<p>You can experience the complete frontend immediately via the demo system:</p>
+
+<h3>Demo URL</h3>
+
+<p>Once the development server is running:</p>
+<pre><code>http://localhost:5173</code></pre>
+
+<h3>Demo accounts (one-click login)</h3>
+
+<p>The login page features two prominent demo cards above the form. No typing required.</p>
+
+<p>| Click | Identity | Lands at |</p>
+<p>|---|---|---|</p>
+<p>| <strong>Super Admin card</strong> | Alex Morgan | <code>/admin/dashboard</code> |</p>
+<p>| <strong>Publisher card</strong> | Sarah Chen | <code>/dashboard</code> |</p>
+
+<h3>What to explore</h3>
+
+<strong>As Super Admin:</strong>
+<ol><li>The dashboard with KPIs, charts, and tables</li></ol>
+<ol><li>Users page — try filters, search, click into a user detail</li></ol>
+<ol><li>Plans — try creating a new plan</li></ol>
+<ol><li>Billing — see revenue chart and failed payments alert</li></ol>
+<ol><li>Integrations — try editing the Anthropic key</li></ol>
+<ol><li>Content Monitor — cross-tenant article view</li></ol>
+<ol><li>Audit Logs — timeline visualization</li></ol>
+<ol><li>Settings — explore the 5 tabs</li></ol>
+
+<strong>As Publisher:</strong>
+<ol><li>Dashboard with personalized greeting and quick actions</li></ol>
+<ol><li>**New Article** — walk through the entire 5-step wizard (Research → Outline → Draft → SEO → Publish)</li></ol>
+<ol><li>Articles — toggle between grid and table views</li></ol>
+<ol><li>Click any article to see the detail editor with AI tools</li></ol>
+<ol><li>Research Hub — search a topic, generate a brief</li></ol>
+<ol><li>SEO Tools — try all 4 sub-tools</li></ol>
+<ol><li>CMS — see connected platforms, try connecting a new one</li></ol>
+<ol><li>Brand Voice — view profiles, set active</li></ol>
+<ol><li>Templates — see built-ins, try Use template</li></ol>
+<ol><li>Analytics — view performance charts</li></ol>
+<ol><li>Team — see members, try inviting</li></ol>
+
+<h3>Theme switching</h3>
+
+<p>A theme toggle button is present in every layout's top bar. Try both light and dark modes to see how the design adapts. The page background uses an atmospheric radial gradient unique to each mode.</p>
+
+<h3>Responsive testing</h3>
+
+<p>Resize the browser window or use device simulation in DevTools:</p>
+<ul><li>375px (mobile) — sidebar collapses to overlay drawer</li></ul>
+<ul><li>768px (tablet) — adjusted spacing</li></ul>
+<ul><li>1280px (desktop) — full sidebar</li></ul>
+<ul><li>1920px (ultra-wide) — content centered with max-width</li></ul>
+
+<hr/>
+
+<h2>15. Roadmap</h2>
+
+<h3>Immediate next steps (post-approval)</h3>
+
+<p>| Week | Deliverable |</p>
+<p>|---|---|</p>
+<p>| 1 | Backend Mongoose models for User, Workspace, Article, Subscription |</p>
+<p>| 2 | Auth API (register, login, OTP, password reset) wired to frontend |</p>
+<p>| 3 | Article CRUD API + frontend integration replacing mock data |</p>
+<p>| 4 | Research Agent + Brief Agent operational |</p>
+<p>| 5 | Outline Agent + Writing Agent with streaming |</p>
+<p>| 6 | SEO Agent + Brand Voice Agent |</p>
+<p>| 7 | WordPress CMS Publishing Agent |</p>
+<p>| 8 | Stripe billing + plan enforcement |</p>
+<p>| 9 | End-to-end testing, bug fixes |</p>
+<p>| 10 | Production deployment |</p>
+
+<h3>Post-MVP enhancements (months 4-6)</h3>
+
+<ul><li>Ghost CMS integration</li></ul>
+<ul><li>Real-time article generation streaming via Server-Sent Events</li></ul>
+<ul><li>Article version history with rollback UI</li></ul>
+<ul><li>Bulk operations (CSV import/export)</li></ul>
+<ul><li>Notion integration for write-in-Notion → publish-to-WordPress workflow</li></ul>
+
+<h3>Scale phase (months 7-12)</h3>
+
+<ul><li>Contentful and Sanity CMS support</li></ul>
+<ul><li>Multilingual article generation (Spanish, French, Bengali, Arabic)</li></ul>
+<ul><li>Social media repurposing (LinkedIn post, X thread, Instagram caption from one article)</li></ul>
+<ul><li>Internal link suggestion engine using vector embeddings</li></ul>
+<ul><li>Plagiarism check integration (Originality.ai or Copyleaks)</li></ul>
+<ul><li>Content refresh engine (suggest updates to articles 6+ months old)</li></ul>
+<ul><li>Mobile companion app (React Native)</li></ul>
+<ul><li>Advanced analytics with article performance feedback loops</li></ul>
+
+<h3>Long-term vision</h3>
+
+<ul><li>White-label deployment for enterprise customers</li></ul>
+<ul><li>API marketplace where third-party developers can build extensions</li></ul>
+<ul><li>AI agent marketplace where specialized agents (legal review, medical fact-check, technical accuracy) can be installed as plugins</li></ul>
+
+<hr/>
+
+<h2>Closing Notes</h2>
+
+<p>This proposal represents the result of focused engineering work to produce a fully functional, demo-ready frontend along with a production-grade backend boilerplate. Every screen the client sees is real, interactive, and polished to a level matching industry-leading SaaS products.</p>
+
+<p>The remaining work is well-defined, sequenced, and proceeds through a 10-week implementation plan. There are no architectural unknowns — the system design has been thoroughly validated against the original system design document and the technical proposal response.</p>
+
+<p>The platform is positioned to compete in a fast-growing market segment (AI publishing tools), with a unique combination of features that no single competitor currently offers in one product:</p>
+
+<ul><li>Multi-CMS publishing</li></ul>
+<ul><li>Trained brand voice</li></ul>
+<ul><li>Multi-step quality control with human review</li></ul>
+<ul><li>Multi-tenant SaaS with role-based collaboration</li></ul>
+<ul><li>Premium UX comparable to Linear, Vercel, Stripe</li></ul>
+
+<p>We invite you to explore the demo, walk through both panels, and let us know which features resonate strongest, which would benefit from refinement, and which additional capabilities you would like prioritized for the MVP launch.</p>
+
+<p>We look forward to building this product together.</p>
+
+<hr/>
+
+<em>This document was prepared as a comprehensive technical and product proposal for the Newsroom MCP platform.</em>
+
+<em>Frontend repository: https://github.com/dev-mohiuddin/news-room-mcp</em>
+
+<em>Document version 1.0 — May 2026</em>
+
+</body>
+</html>
