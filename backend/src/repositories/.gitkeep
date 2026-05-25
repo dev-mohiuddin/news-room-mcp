@@ -1,0 +1,7 @@
+Place data-access functions here. Convention:
+  repositories/<entity>Repository.js
+
+Repositories should:
+- Be the only layer that talks to Mongoose models
+- Return plain results — let services compose business meaning
+- Use the paginateModel() helper from utils/paginationUtil.js for list endpoints

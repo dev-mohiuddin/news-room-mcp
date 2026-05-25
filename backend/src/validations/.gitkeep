@@ -1,0 +1,5 @@
+Place Zod validation schemas here. Convention:
+  validations/<module>/<module>Validation.js
+
+Each schema should match req shape:
+  z.object({ body: ..., query: ..., params: ... })

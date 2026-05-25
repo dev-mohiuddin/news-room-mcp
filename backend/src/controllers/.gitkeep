@@ -1,0 +1,4 @@
+Place feature controllers here. Convention:
+  controllers/<module>/<module>Controller.js
+
+Example: controllers/auth/authController.js

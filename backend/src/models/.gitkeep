@@ -1,0 +1,2 @@
+Place Mongoose models here. Convention:
+  models/<entity>Model.js  (e.g. userModel.js, articleModel.js)

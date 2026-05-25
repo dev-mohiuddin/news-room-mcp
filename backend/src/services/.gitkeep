@@ -1,0 +1,7 @@
+Place business logic services here. Convention:
+  services/<module>/<module>Service.js
+
+Services should:
+- Validate business rules (not request shape — that's validators)
+- Compose repositories
+- Throw via throwError(message, statusCode) — NEVER touch req/res
