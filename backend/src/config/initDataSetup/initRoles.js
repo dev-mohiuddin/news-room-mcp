@@ -1,49 +1,41 @@
 import { logger } from "#utils/logger.js";
-import { PLATFORM_ROLES } from "#constants/roles.js";
+import { Role } from "#models/roleModel.js";
+import { SEEDED_ROLES } from "#constants/roles.js";
 
 /**
- * Seeds the SuperAdmin + User roles into the Role collection.
+ * Idempotent role seeder.
  *
- * STUB: This function only runs once a Role model is added.
- * Until then, it logs the planned role definitions for verification.
+ *   - Seeded roles missing in DB → created
+ *   - Seeded roles existing in DB → permissions/displayName synced (so deploys
+ *     that change the static catalog automatically reflect)
+ *   - Custom platform roles created via /admin/roles → never touched
  *
- * To activate, create `src/models/roleModel.js` exporting `Role`,
- * then uncomment the import + create/update logic below.
+ * The seeder ONLY touches roles whose `name` matches a SEEDED_ROLES entry.
  */
 export const initPlatformRoles = async () => {
-  // Lazy import — safe even when the model doesn't exist yet.
-  let Role;
-  try {
-    const mod = await import("#models/roleModel.js");
-    Role = mod.Role || mod.default;
-  } catch {
-    logger.info(
-      `[initRoles] Skipped — roleModel.js not present yet. Planned roles: ${PLATFORM_ROLES.map((r) => r.name).join(", ")}`
-    );
-    return;
-  }
+  for (const seed of SEEDED_ROLES) {
+    const existing = await Role.findOne({ name: seed.name });
 
-  if (!Role) return;
-
-  for (const roleData of PLATFORM_ROLES) {
-    const existing = await Role.findOne({ name: roleData.name });
     if (!existing) {
-      await Role.create(roleData);
-      logger.info(`Role created: ${roleData.name}`);
+      await Role.create(seed);
+      logger.info(`Role created: ${seed.name} (${seed.scope})`);
       continue;
     }
 
     const dirty =
-      existing.description !== roleData.description ||
-      existing.hierarchy !== roleData.hierarchy ||
-      existing.isDefault !== roleData.isDefault ||
+      existing.displayName !== seed.displayName ||
+      existing.description !== seed.description ||
+      existing.scope !== seed.scope ||
+      existing.isDefault !== seed.isDefault ||
+      existing.isSystem !== seed.isSystem ||
+      existing.isStatic !== seed.isStatic ||
       JSON.stringify([...(existing.permissions || [])].sort()) !==
-        JSON.stringify([...roleData.permissions].sort());
+        JSON.stringify([...seed.permissions].sort());
 
     if (dirty) {
-      Object.assign(existing, roleData);
+      Object.assign(existing, seed);
       await existing.save();
-      logger.info(`Role synced: ${roleData.name}`);
+      logger.info(`Role synced: ${seed.name}`);
     }
   }
 };

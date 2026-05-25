@@ -1,20 +1,20 @@
 import express from "express";
+import { authRouter } from "#routes/v1/auth/authRoute.js";
+import { roleRouter } from "#routes/v1/role/roleRoute.js";
+import { adminUserRouter } from "#routes/v1/user/userRoute.js";
+import { teamRouter } from "#routes/v1/team/teamRoute.js";
+import { auditRouter } from "#routes/v1/audit/auditRoute.js";
 
 /**
  * v1 API aggregator.
- *
- * Mount each feature module router here as you build it.
- *
- * Example:
- *   import { authRouter } from "#routes/v1/auth/authRoute.js";
- *   import { articleRouter } from "#routes/v1/article/articleRoute.js";
- *
- *   apiRouterV1.use("/v1", authRouter);
- *   apiRouterV1.use("/v1", articleRouter);
+ * All feature routers are mounted at /api/v1.
  */
 export const apiRouterV1 = express.Router();
 
-// No feature routers wired yet — keep the router empty until you add modules.
-// (Express 5 rejects empty handler arrays, so we just don't call `.use` here.)
+apiRouterV1.use("/v1", authRouter);
+apiRouterV1.use("/v1", roleRouter);
+apiRouterV1.use("/v1", adminUserRouter);
+apiRouterV1.use("/v1", teamRouter);
+apiRouterV1.use("/v1", auditRouter);
 
 export default apiRouterV1;

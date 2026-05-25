@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { ROLES } from "@/lib/constants";
+import { getRedirectFor } from "@/lib/permissions";
 
 // Optional helper page — if mounted at "/", routes user to their panel
 // when authenticated, or stays on landing otherwise.
@@ -12,9 +12,7 @@ export default function RootPage() {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const target =
-        user.role === ROLES.SUPER_ADMIN ? "/admin/dashboard" : "/dashboard";
-      navigate(target, { replace: true });
+      navigate(getRedirectFor(user), { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 

@@ -10,6 +10,8 @@ import Logo from "@/components/shared/Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import useAuth from "@/hooks/useAuth";
+import { hasPermission } from "@/lib/permissions";
+import { useMemo } from "react";
 import {
   LogOut,
   ChevronsLeft,
@@ -27,6 +29,19 @@ export default function Sidebar({ nav = [], variant = "user" }) {
   const sidebarOpen = useSelector((s) => s.ui.sidebarOpen);
   const { user, logout } = useAuth();
   const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+  // Filter nav by permissions — items without `requiredPerm` are always shown.
+  // Empty groups (no visible items) are hidden entirely.
+  const visibleNav = useMemo(() => {
+    return nav
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) => !item.requiredPerm || hasPermission(user, item.requiredPerm)
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [nav, user]);
 
   // Auto-close mobile drawer on navigation.
   useEffect(() => {
@@ -77,7 +92,7 @@ export default function Sidebar({ nav = [], variant = "user" }) {
 
       {/* nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5 scrollbar-hide">
-        {nav.map((group) => (
+        {visibleNav.map((group) => (
           <div key={group.group}>
             {!effectiveCollapsed && (
               <p className="px-2 mb-1.5 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">

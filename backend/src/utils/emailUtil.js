@@ -127,3 +127,29 @@ export const sendWelcomeEmail = async (email, firstName) => {
     </div>`;
   await sendEmail({ to: email, subject, html });
 };
+
+export const sendInvitationEmail = async (
+  email,
+  { inviteUrl, inviterName = "A teammate", roleName = "Team member" }
+) => {
+  const subject = `${APP_NAME} — You're invited to join a workspace`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #f9fafb;">
+      <div style="background: white; border-radius: 12px; padding: 32px;">
+        <h2 style="color: #1a1a2e; margin-top: 0;">You're invited!</h2>
+        <p style="color: #4b5563;">
+          <strong>${inviterName}</strong> invited you to their workspace on ${APP_NAME}
+          as <strong>${roleName}</strong>.
+        </p>
+        <p style="margin: 24px 0;">
+          <a href="${inviteUrl}" style="display:inline-block;padding:12px 22px;background:#7c3aed;color:white;border-radius:8px;text-decoration:none;font-weight:600;">
+            Accept invitation
+          </a>
+        </p>
+        <p style="color: #6b7280; font-size: 13px;">
+          This invitation expires in 7 days. If you didn't expect it, you can ignore this email.
+        </p>
+      </div>
+    </div>`;
+  await sendEmail({ to: email, subject, html });
+};

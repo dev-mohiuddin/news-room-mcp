@@ -1,13 +1,29 @@
 import { API, handleRequest } from "@/lib/http";
 
-export const getTeamMembers = (query = "") =>
-  handleRequest(() => API.get(`/api/team${query}`));
+const BASE = "/api/v1/team";
+const PUBLIC_BASE = "/api/v1/auth/invitations";
 
-export const inviteMember = (data) =>
-  handleRequest(() => API.post(`/api/team/invite`, data));
+export const getTeamApi = () =>
+  handleRequest(() => API.get(BASE));
 
-export const updateMemberRole = (id, data) =>
-  handleRequest(() => API.put(`/api/team/${id}/role`, data));
+export const inviteMemberApi = (payload) =>
+  handleRequest(() => API.post(`${BASE}/invitations`, payload));
 
-export const removeMember = (id) =>
-  handleRequest(() => API.delete(`/api/team/${id}`));
+export const resendInviteApi = (id) =>
+  handleRequest(() => API.post(`${BASE}/invitations/${id}/resend`));
+
+export const cancelInviteApi = (id) =>
+  handleRequest(() => API.delete(`${BASE}/invitations/${id}`));
+
+export const changeMemberRoleApi = (id, roleName) =>
+  handleRequest(() => API.patch(`${BASE}/members/${id}/role`, { roleName }));
+
+export const removeMemberApi = (id) =>
+  handleRequest(() => API.delete(`${BASE}/members/${id}`));
+
+/* Public — accept invite */
+export const inspectInviteApi = (token) =>
+  handleRequest(() => API.get(`${PUBLIC_BASE}/${token}`));
+
+export const acceptInviteApi = (token, payload) =>
+  handleRequest(() => API.post(`${PUBLIC_BASE}/${token}/accept`, payload));

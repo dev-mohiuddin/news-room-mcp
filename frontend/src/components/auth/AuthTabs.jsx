@@ -16,7 +16,7 @@ import DemoLoginCards from "@/components/auth/DemoLoginCards";
 import AuthOrDivider from "@/components/auth/AuthOrDivider";
 
 import { fadeUp } from "@/lib/animations";
-import { ROLES } from "@/lib/constants";
+import { getRedirectFor } from "@/lib/permissions";
 
 const TAB_HEADERS = {
   login: {
@@ -48,9 +48,7 @@ export default function AuthTabs({ defaultTab = "login" }) {
   // Bounce already-authenticated users out of the auth surface.
   useEffect(() => {
     if (isAuthenticated && user) {
-      const target =
-        user.role === ROLES.SUPER_ADMIN ? "/admin/dashboard" : "/dashboard";
-      navigate(target, { replace: true });
+      navigate(getRedirectFor(user), { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
 

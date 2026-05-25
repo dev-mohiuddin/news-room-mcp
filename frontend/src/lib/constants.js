@@ -1,13 +1,14 @@
 // App-wide constants
+import { ROLES as ROLES_FROM_PERMISSIONS } from "./permissions";
 
 export const APP_NAME = "Newsroom MCP";
 export const APP_TAGLINE = "Publish Smarter. Write with AI. Reach Further.";
 export const SUPPORT_EMAIL = "support@newsroommcp.com";
 
-export const ROLES = {
-  SUPER_ADMIN: "super_admin",
-  USER: "user",
-};
+// Re-export the canonical ROLES from permissions.js so there is ONE
+// source of truth across the app. Backend sends `workspace_owner` for
+// tenants — anything checking `role === "user"` is wrong.
+export const ROLES = ROLES_FROM_PERMISSIONS;
 
 export const NAV_LINKS = [
   { label: "Features", href: "#features" },
@@ -240,51 +241,56 @@ export const FAQS = [
   },
 ];
 
-/* ── Sidebar nav links ── */
+/* ── Sidebar nav links ──
+ *  `requiredPerm` (optional) — if present, the item is hidden when the user
+ *  lacks the permission. Wildcard "*" passes everything. The Sidebar
+ *  component filters items based on req.user.permissions.
+ */
 
 export const SUPER_ADMIN_NAV = [
   { group: "Overview", items: [
     { label: "Dashboard", path: "/admin/dashboard", icon: "LayoutDashboard" },
-    { label: "Analytics", path: "/admin/analytics", icon: "BarChart3" },
+    { label: "Analytics", path: "/admin/analytics", icon: "BarChart3", requiredPerm: "platform.analytics:read" },
   ]},
   { group: "Users", items: [
-    { label: "Users", path: "/admin/users", icon: "Users" },
-    { label: "Plans", path: "/admin/plans", icon: "CreditCard" },
+    { label: "Users", path: "/admin/users", icon: "Users", requiredPerm: "platform.user:read" },
+    { label: "Roles", path: "/admin/roles", icon: "ShieldCheck", requiredPerm: "platform.role:manage" },
+    { label: "Plans", path: "/admin/plans", icon: "CreditCard", requiredPerm: "platform.plan:manage" },
   ]},
   { group: "Content", items: [
-    { label: "All Articles", path: "/admin/content", icon: "FileText" },
-    { label: "Integrations", path: "/admin/integrations", icon: "Plug" },
+    { label: "All Articles", path: "/admin/content", icon: "FileText", requiredPerm: "platform.content:moderate" },
+    { label: "Integrations", path: "/admin/integrations", icon: "Plug", requiredPerm: "platform.integration:manage" },
   ]},
   { group: "Billing", items: [
-    { label: "Billing", path: "/admin/billing", icon: "Wallet" },
+    { label: "Billing", path: "/admin/billing", icon: "Wallet", requiredPerm: "platform.billing:read" },
   ]},
   { group: "System", items: [
-    { label: "Notifications", path: "/admin/notifications", icon: "Bell" },
-    { label: "Audit Logs", path: "/admin/logs", icon: "ScrollText" },
-    { label: "Support", path: "/admin/support", icon: "LifeBuoy" },
-    { label: "Settings", path: "/admin/settings", icon: "Settings" },
+    { label: "Notifications", path: "/admin/notifications", icon: "Bell", requiredPerm: "platform.broadcast:send" },
+    { label: "Audit Logs", path: "/admin/logs", icon: "ScrollText", requiredPerm: "platform.audit:read" },
+    { label: "Support", path: "/admin/support", icon: "LifeBuoy", requiredPerm: "platform.support:manage" },
+    { label: "Settings", path: "/admin/settings", icon: "Settings", requiredPerm: "platform.settings:manage" },
   ]},
 ];
 
 export const USER_NAV = [
   { group: "Workspace", items: [
     { label: "Dashboard", path: "/dashboard", icon: "LayoutDashboard" },
-    { label: "New Article", path: "/dashboard/new-article", icon: "Sparkles", highlight: true },
-    { label: "Articles", path: "/dashboard/articles", icon: "FileText" },
+    { label: "New Article", path: "/dashboard/new-article", icon: "Sparkles", highlight: true, requiredPerm: "tenant.article:create" },
+    { label: "Articles", path: "/dashboard/articles", icon: "FileText", requiredPerm: "tenant.article:read" },
   ]},
   { group: "Tools", items: [
-    { label: "Research", path: "/dashboard/research", icon: "Search" },
-    { label: "SEO Tools", path: "/dashboard/seo", icon: "TrendingUp" },
-    { label: "CMS", path: "/dashboard/cms", icon: "Globe" },
-    { label: "Brand Voice", path: "/dashboard/brand-voice", icon: "Mic" },
-    { label: "Templates", path: "/dashboard/templates", icon: "LayoutTemplate" },
+    { label: "Research", path: "/dashboard/research", icon: "Search", requiredPerm: "tenant.research:use" },
+    { label: "SEO Tools", path: "/dashboard/seo", icon: "TrendingUp", requiredPerm: "tenant.seo:use" },
+    { label: "CMS", path: "/dashboard/cms", icon: "Globe", requiredPerm: "tenant.cms:manage" },
+    { label: "Brand Voice", path: "/dashboard/brand-voice", icon: "Mic", requiredPerm: "tenant.brand:manage" },
+    { label: "Templates", path: "/dashboard/templates", icon: "LayoutTemplate", requiredPerm: "tenant.template:manage" },
   ]},
   { group: "Account", items: [
-    { label: "Analytics", path: "/dashboard/analytics", icon: "BarChart3" },
-    { label: "Team", path: "/dashboard/team", icon: "Users" },
-    { label: "API Keys", path: "/dashboard/api-keys", icon: "Key" },
-    { label: "Billing", path: "/dashboard/billing", icon: "Wallet" },
-    { label: "Settings", path: "/dashboard/settings", icon: "Settings" },
+    { label: "Analytics", path: "/dashboard/analytics", icon: "BarChart3", requiredPerm: "tenant.analytics:read" },
+    { label: "Team", path: "/dashboard/team", icon: "Users", requiredPerm: "tenant.team:manage" },
+    { label: "API Keys", path: "/dashboard/api-keys", icon: "Key", requiredPerm: "tenant.apikey:manage" },
+    { label: "Billing", path: "/dashboard/billing", icon: "Wallet", requiredPerm: "tenant.billing:read" },
+    { label: "Settings", path: "/dashboard/settings", icon: "Settings", requiredPerm: "tenant.workspace:manage" },
     { label: "Support", path: "/dashboard/support", icon: "LifeBuoy" },
   ]},
 ];

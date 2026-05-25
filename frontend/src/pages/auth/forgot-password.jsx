@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     const res = await forgotPasswordApi(data);
     setLoading(false);
-    if (res?.status === "success") {
+    if (res?.success) {
       setSent(true);
     } else {
       toast.error(res?.message || "Failed to send reset email");

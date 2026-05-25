@@ -117,9 +117,9 @@ export default function Topbar({ title, variant = "user" }) {
               <p className="text-xs text-muted-foreground truncate">
                 {user?.email || ""}
               </p>
-              {user?.role && (
+              {(user?.roleDisplayName || user?.role) && (
                 <span className="inline-block mt-1.5 text-[9px] uppercase tracking-widest gradient-bg text-white px-1.5 py-0.5 rounded">
-                  {user.role.replace("_", " ")}
+                  {user.roleDisplayName || user.role.replace(/_/g, " ")}
                 </span>
               )}
             </DropdownMenuLabel>

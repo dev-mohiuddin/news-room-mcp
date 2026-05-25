@@ -1,13 +1,16 @@
 import { verifyAccessToken } from "#utils/jwtUtil.js";
+import { findUserById } from "#repositories/userRepository.js";
 
 /**
- * `protect` — Verifies JWT from Authorization header or cookie.
- * Attaches `req.user` with decoded payload + flags.
+ * `protect` — verifies JWT + loads current user from DB.
  *
- * NOTE: This middleware does NOT load the user from the database — that's the
- * caller's responsibility (usually via a userRepository call), so the auth
- * layer stays decoupled from any specific User model. When you wire your User
- * model, swap in a `findUserById` lookup here.
+ * Why DB load instead of just trusting the JWT payload?
+ *   - Permissions can change after token issuance (admin updated role)
+ *   - Account suspension takes effect immediately
+ *   - Email verification status reflects current state
+ *
+ * Attaches:
+ *   req.user = { id, email, role, permissions, isVerified, isActive, ... }
  */
 export const protect = async (req, res, next) => {
   try {
@@ -24,14 +27,31 @@ export const protect = async (req, res, next) => {
     }
 
     const decoded = verifyAccessToken(token);
+    const userId = decoded.id || decoded.sub;
 
+    const user = await findUserById(userId);
+    if (!user) {
+      return res.error({ message: "User not found", statusCode: 401 });
+    }
+    if (!user.isActive) {
+      return res.error({
+        message: "Account is suspended. Contact support.",
+        statusCode: 403,
+      });
+    }
+
+    const role = user.roleId;
     req.user = {
-      id: decoded.id || decoded.sub,
-      email: decoded.email,
-      role: decoded.role,
-      permissions: decoded.permissions || [],
-      workspaceId: decoded.workspaceId || null,
-      ...decoded,
+      id: user._id.toString(),
+      email: user.email,
+      name: user.name,
+      role: role?.name || null,
+      roleId: role?._id?.toString() || null,
+      roleScope: role?.scope || null,
+      permissions: role?.permissions || [],
+      workspaceId: user.workspaceId?.toString() || null,
+      isVerified: user.isVerified,
+      isActive: user.isActive,
     };
 
     next();
@@ -46,9 +66,11 @@ export const protect = async (req, res, next) => {
 
 /**
  * `authorize(permissions)` — Permission check on top of `protect`.
+ *
  * Accepts a string or string[]. Wildcard `*` always passes.
  *
- *   router.get("/users", protect, authorize(["platform.user:read"]), handler)
+ *   router.get("/articles", protect, authorize("tenant.article:read"), handler);
+ *   router.delete("/users/:id", protect, authorize(["platform.user:manage", "*"]), handler);
  */
 export const authorize = (requiredPermissions) => (req, res, next) => {
   const userPermissions = req.user?.permissions || [];
@@ -72,10 +94,10 @@ export const authorize = (requiredPermissions) => (req, res, next) => {
 
 /**
  * `authorizeRoles(roles)` — Role-based check (alternative to permissions).
- *   router.get("/admin", protect, authorizeRoles(["SuperAdmin"]), handler)
+ *   router.get("/admin", protect, authorizeRoles(["super_admin"]), handler);
  */
 export const authorizeRoles = (roles) => (req, res, next) => {
-  const role = req.user?.role || req.user?.roleName;
+  const role = req.user?.role;
   const allowed = Array.isArray(roles) ? roles : [roles];
 
   if (!role || !allowed.includes(role)) {

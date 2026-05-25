@@ -45,7 +45,7 @@ export default function ResetPasswordPage() {
     setLoading(true);
     const res = await resetPasswordApi(token, { password: data.password });
     setLoading(false);
-    if (res?.status === "success") {
+    if (res?.success) {
       setDone(true);
     } else {
       toast.error(res?.message || "Could not reset password");

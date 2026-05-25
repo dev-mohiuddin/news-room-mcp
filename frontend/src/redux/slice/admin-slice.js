@@ -1,87 +1,86 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
-  getAllUsers,
-  getUserDetail,
-  updateUserStatus,
-  getAdminPlans,
-  getAdminAnalytics,
-  getAuditLogs,
-} from "@/api/admin/admin";
+  listUsersApi,
+  getUserApi,
+  changeUserRoleApi,
+  setUserStatusApi,
+  deleteUserApi,
+} from "@/api/admin/users";
+import { listAuditLogsApi } from "@/api/admin/audit";
 
-export const fetchAllUsers = createAsyncThunk(
-  "admin/users/fetchAll",
-  async (params = {}, { rejectWithValue }) => {
-    const {
-      page = 1,
-      rows = 10,
-      sortField = "id",
-      sortOrder = "desc",
-      search_term = "",
-    } = params;
-    const res = await getAllUsers(
-      `?page=${page}&rows=${rows}&sort_order=${sortOrder}&sortField=${sortField}&search_term=${search_term}`
-    );
-    if (res?.status === "success") return res.data;
-    return rejectWithValue(res?.message);
+/* ──────────────────────────────────────────────────────────
+ *  Thunks — Users
+ * ────────────────────────────────────────────────────────── */
+export const fetchUsers = createAsyncThunk(
+  "admin/users/list",
+  async (params, { rejectWithValue }) => {
+    const res = await listUsersApi(params);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to load users");
   }
 );
 
-export const fetchUserDetail = createAsyncThunk(
-  "admin/users/fetchOne",
+export const fetchUserById = createAsyncThunk(
+  "admin/users/get",
   async (id, { rejectWithValue }) => {
-    const res = await getUserDetail(id);
-    if (res?.status === "success") return res.data.user;
-    return rejectWithValue(res?.message);
+    const res = await getUserApi(id);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to load user");
   }
 );
 
-export const toggleUserStatus = createAsyncThunk(
-  "admin/users/toggleStatus",
-  async ({ id, data }, { rejectWithValue }) => {
-    const res = await updateUserStatus(id, data);
-    if (res?.status === "success") return res.data.user;
-    return rejectWithValue(res?.message);
+export const changeUserRole = createAsyncThunk(
+  "admin/users/changeRole",
+  async ({ id, roleId }, { rejectWithValue }) => {
+    const res = await changeUserRoleApi(id, roleId);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to change role");
   }
 );
 
-export const fetchAdminPlans = createAsyncThunk(
-  "admin/plans/fetch",
-  async (_, { rejectWithValue }) => {
-    const res = await getAdminPlans();
-    if (res?.status === "success") return res.data;
-    return rejectWithValue(res?.message);
+export const setUserStatus = createAsyncThunk(
+  "admin/users/setStatus",
+  async ({ id, isActive }, { rejectWithValue }) => {
+    const res = await setUserStatusApi(id, isActive);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to update status");
   }
 );
 
-export const fetchAdminAnalytics = createAsyncThunk(
-  "admin/analytics/fetch",
-  async (params = "", { rejectWithValue }) => {
-    const res = await getAdminAnalytics(params);
-    if (res?.status === "success") return res.data;
-    return rejectWithValue(res?.message);
+export const removeUser = createAsyncThunk(
+  "admin/users/delete",
+  async (id, { rejectWithValue }) => {
+    const res = await deleteUserApi(id);
+    if (res?.success) return { id, ...res };
+    return rejectWithValue(res?.message || "Failed to delete user");
   }
 );
 
+/* ──────────────────────────────────────────────────────────
+ *  Thunks — Audit logs
+ * ────────────────────────────────────────────────────────── */
 export const fetchAuditLogs = createAsyncThunk(
-  "admin/logs/fetch",
-  async (params = "", { rejectWithValue }) => {
-    const res = await getAuditLogs(params);
-    if (res?.status === "success") return res.data;
-    return rejectWithValue(res?.message);
+  "admin/logs/list",
+  async (params, { rejectWithValue }) => {
+    const res = await listAuditLogsApi(params);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to load logs");
   }
 );
 
+/* ──────────────────────────────────────────────────────────
+ *  Slice
+ * ────────────────────────────────────────────────────────── */
 const initialState = {
   users: [],
-  singleUser: null,
-  plans: [],
-  analytics: null,
-  logs: [],
-  pagination: null,
+  usersPagination: null,
+  currentUser: null,
 
-  getLoading: false,
-  updateLoading: false,
-  success: null,
+  logs: [],
+  logsPagination: null,
+
+  isLoading: false,
+  isMutating: false,
   error: null,
 };
 
@@ -89,51 +88,71 @@ const adminSlice = createSlice({
   name: "admin",
   initialState,
   reducers: {
-    clearAdminMessages: (state) => {
-      state.success = null;
+    clearAdminError: (state) => {
       state.error = null;
+    },
+    clearCurrentUser: (state) => {
+      state.currentUser = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchAllUsers.pending, (state) => {
-        state.getLoading = true;
+      /* Users */
+      .addCase(fetchUsers.pending, (state) => {
+        state.isLoading = true;
         state.error = null;
       })
-      .addCase(fetchAllUsers.fulfilled, (state, action) => {
-        state.getLoading = false;
-        state.users = action.payload?.users ?? [];
-        state.pagination = action.payload?.pagination ?? null;
+      .addCase(fetchUsers.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.users = action.payload.data || [];
+        state.usersPagination = action.payload.pagination || null;
       })
-      .addCase(fetchAllUsers.rejected, (state, action) => {
-        state.getLoading = false;
+      .addCase(fetchUsers.rejected, (state, action) => {
+        state.isLoading = false;
         state.error = action.payload;
       })
 
-      .addCase(fetchUserDetail.fulfilled, (state, action) => {
-        state.singleUser = action.payload;
+      .addCase(fetchUserById.fulfilled, (state, action) => {
+        state.currentUser = action.payload.data;
       })
 
-      .addCase(toggleUserStatus.fulfilled, (state, action) => {
+      .addCase(changeUserRole.fulfilled, (state, action) => {
+        const user = action.payload.data;
+        if (!user) return;
         state.users = state.users.map((u) =>
-          u.id === action.payload.id ? action.payload : u
+          u._id === user._id ? user : u
         );
-        state.success = "User status updated";
+        if (state.currentUser?._id === user._id) state.currentUser = user;
       })
 
-      .addCase(fetchAdminPlans.fulfilled, (state, action) => {
-        state.plans = action.payload?.plans ?? [];
+      .addCase(setUserStatus.fulfilled, (state, action) => {
+        const user = action.payload.data;
+        if (!user) return;
+        state.users = state.users.map((u) =>
+          u._id === user._id ? user : u
+        );
+        if (state.currentUser?._id === user._id) state.currentUser = user;
       })
 
-      .addCase(fetchAdminAnalytics.fulfilled, (state, action) => {
-        state.analytics = action.payload;
+      .addCase(removeUser.fulfilled, (state, action) => {
+        state.users = state.users.filter((u) => u._id !== action.payload.id);
       })
 
+      /* Audit logs */
+      .addCase(fetchAuditLogs.pending, (state) => {
+        state.isLoading = true;
+      })
       .addCase(fetchAuditLogs.fulfilled, (state, action) => {
-        state.logs = action.payload?.logs ?? [];
+        state.isLoading = false;
+        state.logs = action.payload.data || [];
+        state.logsPagination = action.payload.pagination || null;
+      })
+      .addCase(fetchAuditLogs.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
       });
   },
 });
 
-export const { clearAdminMessages } = adminSlice.actions;
+export const { clearAdminError, clearCurrentUser } = adminSlice.actions;
 export default adminSlice.reducer;

@@ -9,8 +9,10 @@ import {
   // Auth
   Login,
   Register,
+  VerifyOtp,
   ForgotPassword,
   ResetPassword,
+  AcceptInvite,
   GuestRoute,
   // Layouts (we mount layouts as element, then nest pages via children below)
   // Admin pages
@@ -26,6 +28,7 @@ import {
   AdminSettings,
   AdminAuditLogs,
   AdminSupport,
+  AdminRoles,
   // User pages
   UserDashboard,
   NewArticle,
@@ -72,6 +75,14 @@ export const publicRoutes = [
     ),
   },
   {
+    path: "/auth/verify-otp",
+    element: (
+      <GuestRoute>
+        <VerifyOtp />
+      </GuestRoute>
+    ),
+  },
+  {
     path: "/auth/forgot-password",
     element: (
       <GuestRoute>
@@ -86,6 +97,10 @@ export const publicRoutes = [
         <ResetPassword />
       </GuestRoute>
     ),
+  },
+  {
+    path: "/auth/accept-invite/:token",
+    element: <AcceptInvite />, // works for both authed + guest
   },
 ];
 
@@ -117,6 +132,7 @@ export const privateRoutes = [
       { path: "settings", element: <AdminSettings /> },
       { path: "logs", element: <AdminAuditLogs /> },
       { path: "support", element: <AdminSupport /> },
+      { path: "roles", element: <AdminRoles /> },
     ],
   },
 
@@ -124,7 +140,15 @@ export const privateRoutes = [
   {
     path: "/dashboard",
     element: <UserLayout />,
-    roles: [ROLES.USER, ROLES.SUPER_ADMIN],
+    // Any tenant role can enter the user panel — page-level permission
+    // gates handle finer-grained access.
+    roles: [
+      ROLES.WORKSPACE_OWNER,
+      ROLES.EDITOR,
+      ROLES.WRITER,
+      ROLES.VIEWER,
+      ROLES.SUPER_ADMIN, // super_admin can preview tenant flow
+    ],
     children: [
       { index: true, element: <UserDashboard /> },
       { path: "new-article", element: <NewArticle /> },

@@ -87,10 +87,19 @@ export const dateFormater = (val, dateFormat = "yyyy-MM-dd") => {
 };
 
 let isLoggingOut = false;
-export const handleLogout = () => {
+export const handleLogout = async () => {
   if (isLoggingOut) return;
   isLoggingOut = true;
   toast.error("Session expired! Please login again.");
+
+  // Best-effort backend logout (clears server-side cookies). Don't block on it.
+  try {
+    const { logoutApi } = await import("@/api/auth/auth");
+    await logoutApi();
+  } catch {
+    /* swallow — local cleanup still happens below */
+  }
+
   localStorage.removeItem("persist:root");
   localStorage.removeItem("token");
   localStorage.removeItem("user");

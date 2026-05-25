@@ -12,6 +12,7 @@ import billingSlice from "./slice/billing-slice";
 import adminSlice from "./slice/admin-slice";
 import brandSlice from "./slice/brand-slice";
 import teamSlice from "./slice/team-slice";
+import roleSlice from "./slice/role-slice";
 
 // Persist only auth + ui (rest are server data)
 const persistConfig = {
@@ -31,6 +32,7 @@ const rootReducer = combineReducers({
   admin: adminSlice,
   brand: brandSlice,
   team: teamSlice,
+  role: roleSlice,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

@@ -9,6 +9,7 @@ let isLoggingOut = false;
 const API = axios.create({
   baseURL: baseUrl,
   headers: { "Content-Type": "application/json" },
+  withCredentials: true, // send cookies (refresh_token, access_token)
 });
 
 API.interceptors.request.use(
@@ -33,9 +34,14 @@ API.interceptors.response.use(
     doneProgress();
 
     if (error?.response?.status === 401 && !isLoggingOut) {
-      isLoggingOut = true;
-      handleLogout();
-      return;
+      // Don't auto-logout on auth endpoints (login/register can legitimately 401)
+      const url = error?.config?.url || "";
+      const isAuthRoute = url.includes("/auth/");
+      if (!isAuthRoute) {
+        isLoggingOut = true;
+        handleLogout();
+        return;
+      }
     }
 
     return Promise.reject(error);
@@ -60,26 +66,27 @@ API.defaults.onUploadProgress = function (progressEvent) {
   }
 };
 
+/**
+ * Wraps an axios call so the caller always gets a plain JSON object
+ * with a uniform `success` flag — matching the backend response handler.
+ *
+ * Success: { success: true, data, message, pagination?, ... }
+ * Error  : { success: false, message, statusCode, data, trace?, ... }
+ */
 const handleRequest = async (requestFn) => {
   try {
     const response = await requestFn();
     return response?.data;
   } catch (error) {
-    if (error && error?.response?.status === 401)
-      return {
-        status: "failure",
-        message: "",
-      };
-
-    if (error?.response?.data?.message) {
-      return {
-        status: "failure",
-        message: error?.response?.data?.message,
-      };
+    if (error?.response?.data) {
+      // Backend already shaped the error
+      return error.response.data;
     }
     return {
-      status: "failure",
-      message: "Something went wrong.",
+      success: false,
+      statusCode: 500,
+      message: error?.message || "Network error. Please try again.",
+      data: null,
     };
   }
 };

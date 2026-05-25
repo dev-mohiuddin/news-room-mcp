@@ -7,22 +7,19 @@ import BackgroundOrbs from "@/components/shared/BackgroundOrbs";
 import GradientButton from "@/components/shared/GradientButton";
 import GlassCard from "@/components/shared/GlassCard";
 import { Button } from "@/components/ui/button";
-import { ROLES } from "@/lib/constants";
+import { getRedirectFor, inScope, ROLE_SCOPES } from "@/lib/permissions";
 
 export default function NotFound() {
   const location = useLocation();
   const isAuthenticated = useSelector((s) => s.auth.isAuthenticated);
   const user = useSelector((s) => s.auth.user);
 
-  const homeUrl = isAuthenticated && user
-    ? user.role === ROLES.SUPER_ADMIN
-      ? "/admin/dashboard"
-      : "/dashboard"
-    : "/";
+  const homeUrl =
+    isAuthenticated && user ? getRedirectFor(user) : "/";
 
   // Suggested links based on auth state
   const suggestions = isAuthenticated
-    ? user?.role === ROLES.SUPER_ADMIN
+    ? inScope(user, ROLE_SCOPES.PLATFORM)
       ? [
           { icon: BarChart3, label: "Dashboard", to: "/admin/dashboard" },
           { icon: FileText, label: "Users", to: "/admin/users" },

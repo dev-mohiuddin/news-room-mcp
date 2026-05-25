@@ -8,8 +8,10 @@ import NotFound from "./utils/not-found";
 // Auth
 import Login from "./auth/login";
 import Register from "./auth/register";
+import VerifyOtp from "./auth/verify-otp";
 import ForgotPassword from "./auth/forgot-password";
 import ResetPassword from "./auth/reset-password";
+import AcceptInvite from "./auth/accept-invite";
 import { IsLogin, RoleGuard, GuestRoute } from "./auth/check-auth";
 
 // Super Admin
@@ -25,6 +27,7 @@ import AdminNotifications from "./admin/notifications";
 import AdminSettings from "./admin/settings";
 import AdminAuditLogs from "./admin/audit-logs";
 import AdminSupport from "./admin/support";
+import AdminRoles from "./admin/roles";
 
 // User
 import UserDashboard from "./user/dashboard";
@@ -52,8 +55,10 @@ export {
   // Auth
   Login,
   Register,
+  VerifyOtp,
   ForgotPassword,
   ResetPassword,
+  AcceptInvite,
   IsLogin,
   RoleGuard,
   GuestRoute,
@@ -71,6 +76,7 @@ export {
   AdminSettings,
   AdminAuditLogs,
   AdminSupport,
+  AdminRoles,
 
   // User
   UserDashboard,

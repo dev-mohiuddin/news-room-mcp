@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+/* ──────────────────────────────────────────────────────────
+ *  Auth schemas
+ *
+ *  registerSchema keeps `confirmPassword` + `terms` as
+ *  frontend-only UX fields — they are validated client-side
+ *  and stripped before sending to the backend (which only
+ *  needs name/email/password).
+ * ────────────────────────────────────────────────────────── */
+
 export const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -34,6 +43,16 @@ export const resetPasswordSchema = z
     path: ["confirmPassword"],
   });
 
+/* ── OTP ── */
+export const verifyOtpSchema = z.object({
+  email: z.string().email("Invalid email"),
+  otp: z
+    .string()
+    .length(6, "OTP must be 6 digits")
+    .regex(/^\d{6}$/, "OTP must contain only digits"),
+});
+
+/* ── Article ── */
 export const articleSchema = z.object({
   title: z.string().min(3, "Title is too short"),
   topic: z.string().min(3, "Topic is required"),

@@ -5,32 +5,53 @@ import { motion } from "framer-motion";
 import { Shield, Sparkles, Zap, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
-import { setUser } from "@/redux/slice/auth-slice";
-import { DEMO_ACCOUNTS, persistDemoLogin } from "@/lib/demoAuth";
+import { signInUser } from "@/redux/slice/auth-slice";
+import { DEMO_ACCOUNTS } from "@/lib/demoAuth";
+import { getRedirectFor } from "@/lib/permissions";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 
 const ICONS = { shield: Shield, sparkles: Sparkles };
 
+/**
+ * DemoLoginCards — one-click login using the seeded demo accounts.
+ * Hits the real /api/v1/auth/login endpoint with credentials from
+ * demoAuth.js (which mirror the seed in initSuperAdmin.js).
+ */
 export default function DemoLoginCards() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [busy, setBusy] = useState(null);
 
-  const handleDemoLogin = (key) => {
+  const handleDemoLogin = async (key) => {
+    const profile = DEMO_ACCOUNTS[key];
+    if (!profile) {
+      toast.error("Demo profile not found");
+      return;
+    }
+
     setBusy(key);
-    // Tiny artificial delay so the user sees the loading state.
-    setTimeout(() => {
-      const result = persistDemoLogin(key);
-      if (!result) {
-        toast.error("Could not load demo profile");
-        setBusy(null);
-        return;
+    try {
+      const result = await dispatch(
+        signInUser({ email: profile.email, password: profile.password })
+      ).unwrap();
+
+      const user = result?.data?.user;
+      if (user) {
+        toast.success(`Signed in as ${user.name}`);
+        navigate(getRedirectFor(user), { replace: true });
+      } else {
+        toast.error("Demo login failed — backend may not be seeded yet.");
       }
-      dispatch(setUser(result.user));
-      toast.success(`Signed in as ${result.user.name}`);
-      navigate(result.redirectTo, { replace: true });
-    }, 600);
+    } catch (err) {
+      toast.error(
+        typeof err === "string"
+          ? err
+          : err?.message || "Demo login failed — is the backend running?"
+      );
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -69,7 +90,7 @@ export default function DemoLoginCards() {
               {/* gradient accent stripe */}
               <span
                 className={cn(
-                  "absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b opacity-80",
+                  "absolute left-0 top-0 bottom-0 w-1 bg-linear-to-b opacity-80",
                   profile.accent
                 )}
               />
@@ -87,7 +108,7 @@ export default function DemoLoginCards() {
               <div className="relative flex items-start gap-3">
                 <span
                   className={cn(
-                    "h-9 w-9 rounded-lg bg-gradient-to-br flex items-center justify-center shadow-lg shrink-0",
+                    "h-9 w-9 rounded-lg bg-linear-to-br flex items-center justify-center shadow-lg shrink-0",
                     profile.accent
                   )}
                 >
@@ -118,7 +139,7 @@ export default function DemoLoginCards() {
               </div>
 
               {isBusy && (
-                <span className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent animate-shimmer" />
+                <span className="absolute inset-x-0 bottom-0 h-[2px] bg-linear-to-r from-transparent via-primary to-transparent animate-shimmer" />
               )}
             </motion.button>
           );

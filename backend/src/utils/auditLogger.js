@@ -1,38 +1,67 @@
 import { logger } from "#utils/logger.js";
+import { AuditLog } from "#models/auditLogModel.js";
 
 /**
- * Generic audit logger — currently writes to logger only.
+ * Persistent audit logger.
  *
- * When an AuditLog model is added, replace the body to also persist:
- *   await AuditLog.create({ ... });
+ *   await logAudit({
+ *     actor: req.user,
+ *     category: "user",
+ *     action: "user.role_changed",
+ *     entityType: "user",
+ *     entityId: targetUserId,
+ *     before: { role: "writer" },
+ *     after: { role: "editor" },
+ *     req,
+ *   });
+ *
+ * Never throws — audit failure must not break the user-facing operation.
  */
 export const logAudit = async ({
+  actor = null,
   actorId = null,
+  actorEmail = null,
   actorRole = null,
+  category,
   action,
-  entity,
+  entityType = null,
   entityId = null,
+  workspaceId = null,
+  status = "success",
   before = null,
   after = null,
   metadata = {},
+  req = null,
 } = {}) => {
-  if (!action || !entity) return;
+  try {
+    if (!action || !category) return null;
 
-  const payload = {
-    actorId,
-    actorRole,
-    action,
-    entity,
-    entityId,
-    before,
-    after,
-    metadata,
-    at: new Date().toISOString(),
-  };
+    const payload = {
+      actorId: actorId || actor?.id || actor?._id || null,
+      actorEmail: actorEmail || actor?.email || null,
+      actorRole: actorRole || actor?.role || null,
+      category,
+      action,
+      entityType,
+      entityId,
+      workspaceId,
+      status,
+      before,
+      after,
+      metadata,
+      ip: req?.ip || null,
+      userAgent: req?.headers?.["user-agent"] || null,
+    };
 
-  logger.info("audit", payload);
-
-  // TODO: persist to AuditLog collection once the model is added.
-  // const { AuditLog } = await import("#models/auditLogModel.js");
-  // return AuditLog.create(payload);
+    const log = await AuditLog.create(payload);
+    logger.info(`audit:${action}`, { actor: payload.actorEmail, target: entityId });
+    return log;
+  } catch (err) {
+    logger.error("Audit log failed", {
+      error: err.message,
+      action,
+      category,
+    });
+    return null;
+  }
 };
