@@ -23,3 +23,6 @@ Thumbs.db
 dist/
 coverage/
 .nyc_output/
+
+# Third-party reference material — agents distilled into src/services/article/personas/
+src/agency-agents-main/
