@@ -76,70 +76,72 @@ export default function DataTable({
 
   return (
     <GlassCard className={cn("overflow-hidden", className)}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {columns.map((col) => (
-              <TableHead key={col.key} className={col.className}>
-                {col.sortable ? (
-                  <button
-                    onClick={() => toggleSort(col.key)}
-                    className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-                  >
-                    {col.header}
-                    {sort.key === col.key ? (
-                      sort.dir === "asc" ? (
-                        <ArrowUp className="h-3 w-3" />
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((col) => (
+                <TableHead key={col.key} className={col.className}>
+                  {col.sortable ? (
+                    <button
+                      onClick={() => toggleSort(col.key)}
+                      className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+                    >
+                      {col.header}
+                      {sort.key === col.key ? (
+                        sort.dir === "asc" ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
                       ) : (
-                        <ArrowDown className="h-3 w-3" />
-                      )
-                    ) : (
-                      <ArrowUpDown className="h-3 w-3 opacity-40" />
-                    )}
-                  </button>
-                ) : (
-                  col.header
-                )}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {loading
-            ? Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {columns.map((col) => (
-                    <TableCell key={col.key}>
-                      <div className="h-4 rounded bg-white/5 animate-pulse" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            : rows.map((row) => (
-                <TableRow
-                  key={rowKey(row)}
-                  className={cn(
-                    onRowClick && "cursor-pointer"
+                        <ArrowUpDown className="h-3 w-3 opacity-40" />
+                      )}
+                    </button>
+                  ) : (
+                    col.header
                   )}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                >
-                  {columns.map((col) => (
-                    <TableCell key={col.key} className={col.cellClassName}>
-                      {col.render ? col.render(row) : row[col.key]}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                </TableHead>
               ))}
-        </TableBody>
-      </Table>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading
+              ? Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {columns.map((col) => (
+                      <TableCell key={col.key}>
+                        <div className="h-4 rounded bg-white/5 animate-pulse" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              : rows.map((row) => (
+                  <TableRow
+                    key={rowKey(row)}
+                    className={cn(
+                      onRowClick && "cursor-pointer"
+                    )}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  >
+                    {columns.map((col) => (
+                      <TableCell key={col.key} className={col.cellClassName}>
+                        {col.render ? col.render(row) : row[col.key]}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 py-3 border-t border-white/5 text-xs text-muted-foreground">
-        <span>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-3 sm:px-4 py-3 border-t border-white/5 text-xs text-muted-foreground">
+        <span className="tabular-nums">
           Showing {data.length === 0 ? 0 : start + 1}–
           {Math.min(start + pageSize, sortedData.length)} of {sortedData.length}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 self-stretch sm:self-auto justify-between sm:justify-end w-full sm:w-auto">
           <Button
             variant="ghost"
             size="sm"
@@ -148,7 +150,7 @@ export default function DataTable({
           >
             <ChevronLeft className="h-3.5 w-3.5" /> Prev
           </Button>
-          <span className="px-2">
+          <span className="px-2 tabular-nums">
             Page {safePage} / {totalPages}
           </span>
           <Button
