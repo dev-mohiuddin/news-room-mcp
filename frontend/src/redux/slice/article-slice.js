@@ -1,217 +1,294 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import {
-  getAllArticles,
-  getSingleArticle,
-  createArticle,
-  updateArticle,
-  deleteArticle,
-  publishArticle,
-  articleStatistics,
+  generateArticleApi,
+  listArticlesApi,
+  getArticleApi,
+  updateArticleApi,
+  deleteArticleApi,
+  publishArticleApi,
+  retryArticleApi,
+  cancelArticleApi,
+  duplicateArticleApi,
+  getQuotaApi,
 } from "@/api/article/article";
 
-// Thunks
+/* ──────────────────────────────────────────────────────────
+ *  Thunks — talk to the new article pipeline
+ * ────────────────────────────────────────────────────────── */
 
-export const fetchAllArticles = createAsyncThunk(
-  "articles/fetchAll",
-  async (params = {}, { rejectWithValue }) => {
-    const {
-      page = 1,
-      rows = 10,
-      sortField = "id",
-      sortOrder = "desc",
-      search_term = "",
-    } = params;
-
-    const res = await getAllArticles(
-      `?page=${page}&rows=${rows}&sort_order=${sortOrder}&sortField=${sortField}&search_term=${search_term}`
-    );
-
-    if (res?.status === "success") return res.data;
-    return rejectWithValue(res?.message);
+export const generateArticle = createAsyncThunk(
+  "articles/generate",
+  async (payload, { rejectWithValue }) => {
+    const res = await generateArticleApi(payload);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Could not start generation");
   }
 );
 
-export const fetchSingleArticle = createAsyncThunk(
-  "articles/fetchOne",
+export const fetchArticles = createAsyncThunk(
+  "articles/list",
+  async (params, { rejectWithValue }) => {
+    const res = await listArticlesApi(params);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Could not load articles");
+  }
+);
+
+export const fetchArticleById = createAsyncThunk(
+  "articles/getOne",
   async (id, { rejectWithValue }) => {
-    const res = await getSingleArticle(id);
-    if (res?.status === "success") return res.data.article;
-    return rejectWithValue(res?.message);
+    const res = await getArticleApi(id);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Could not load article");
   }
 );
 
-export const createNewArticle = createAsyncThunk(
-  "articles/create",
-  async (data, { rejectWithValue }) => {
-    const res = await createArticle(data);
-    if (res?.status === "success") return res.data.article;
-    return rejectWithValue(res?.message);
-  }
-);
-
-export const updateExistingArticle = createAsyncThunk(
+export const saveArticleEdits = createAsyncThunk(
   "articles/update",
   async ({ id, data }, { rejectWithValue }) => {
-    const res = await updateArticle(id, data);
-    if (res?.status === "success") return res.data.article;
-    return rejectWithValue(res?.message);
+    const res = await updateArticleApi(id, data);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Could not save");
   }
 );
 
-export const deleteArticleById = createAsyncThunk(
+export const removeArticle = createAsyncThunk(
   "articles/delete",
   async (id, { rejectWithValue }) => {
-    const res = await deleteArticle(id);
-    if (res?.status === "success") return id;
-    return rejectWithValue(res?.message);
+    const res = await deleteArticleApi(id);
+    if (res?.success !== false) return { id };
+    return rejectWithValue(res?.message || "Could not delete");
   }
 );
 
-export const publishArticleById = createAsyncThunk(
+export const publishArticle = createAsyncThunk(
   "articles/publish",
-  async ({ id, data }, { rejectWithValue }) => {
-    const res = await publishArticle(id, data);
-    if (res?.status === "success") return res.data.article;
-    return rejectWithValue(res?.message);
+  async ({ id, payload }, { rejectWithValue }) => {
+    const res = await publishArticleApi(id, payload);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Publish failed");
   }
 );
 
-export const fetchArticleStatistics = createAsyncThunk(
-  "articles/statistics",
-  async (_, { rejectWithValue }) => {
-    const res = await articleStatistics();
-    if (res?.status === "success") return res.data;
-    return rejectWithValue(res?.message);
+export const retryArticle = createAsyncThunk(
+  "articles/retry",
+  async ({ id, from } = {}, { rejectWithValue }) => {
+    const res = await retryArticleApi(id, from ? { from } : {});
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Retry failed");
   }
 );
+
+export const cancelArticle = createAsyncThunk(
+  "articles/cancel",
+  async (id, { rejectWithValue }) => {
+    const res = await cancelArticleApi(id);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Cancel failed");
+  }
+);
+
+export const duplicateArticle = createAsyncThunk(
+  "articles/duplicate",
+  async (id, { rejectWithValue }) => {
+    const res = await duplicateArticleApi(id);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Duplicate failed");
+  }
+);
+
+export const fetchQuota = createAsyncThunk(
+  "articles/quota",
+  async (_, { rejectWithValue }) => {
+    const res = await getQuotaApi();
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Could not load quota");
+  }
+);
+
+/* ──────────────────────────────────────────────────────────
+ *  Slice
+ * ────────────────────────────────────────────────────────── */
 
 const initialState = {
-  articles: [],
-  singleArticle: null,
+  // List
+  list: [],
   pagination: null,
-  statistics: null,
-
-  getLoading: false,
-  createLoading: false,
-  updateLoading: false,
-  deleteLoading: false,
-
-  success: null,
+  // Detail
+  current: null,
+  brief: null,
+  // Live job tracking — `progress[articleId] = { status, stage, percent }`
+  progress: {},
+  // Quota snapshot from /api/v1/quota
+  quota: null,
+  // Flags
+  isLoading: false,
+  isMutating: false,
   error: null,
-  requestStatus: false,
+  lastJobId: null,
 };
 
 const articleSlice = createSlice({
   name: "articles",
   initialState,
   reducers: {
-    clearArticleMessages: (state) => {
-      state.success = null;
+    clearArticleError: (state) => {
       state.error = null;
-      state.requestStatus = false;
+    },
+    clearCurrentArticle: (state) => {
+      state.current = null;
+      state.brief = null;
+    },
+    /** Socket.io `article:progress` */
+    receiveProgress: (state, action) => {
+      const { articleId, status, stage, percent } = action.payload || {};
+      if (!articleId) return;
+      state.progress[articleId] = { status, stage, percent };
+      // Mirror onto list / current if present
+      const idx = state.list.findIndex((a) => a._id === articleId);
+      if (idx >= 0) state.list[idx] = { ...state.list[idx], status };
+      if (state.current?._id === articleId) {
+        state.current = { ...state.current, status };
+      }
+    },
+    /** Socket.io `article:done` */
+    receiveDone: (state, action) => {
+      const { articleId, status } = action.payload || {};
+      if (!articleId) return;
+      state.progress[articleId] = {
+        status,
+        stage: "done",
+        percent: 100,
+      };
+      const idx = state.list.findIndex((a) => a._id === articleId);
+      if (idx >= 0) state.list[idx] = { ...state.list[idx], status };
+      if (state.current?._id === articleId) {
+        state.current = { ...state.current, status };
+      }
+    },
+    /** Socket.io `article:failed` */
+    receiveFailed: (state, action) => {
+      const { articleId, status, failureReason } = action.payload || {};
+      if (!articleId) return;
+      state.progress[articleId] = {
+        status,
+        failureReason,
+        stage: "failed",
+        percent: 100,
+      };
+      const idx = state.list.findIndex((a) => a._id === articleId);
+      if (idx >= 0)
+        state.list[idx] = { ...state.list[idx], status, failureReason };
+      if (state.current?._id === articleId) {
+        state.current = { ...state.current, status, failureReason };
+      }
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchAllArticles.pending, (state) => {
-        state.getLoading = true;
+      .addCase(generateArticle.pending, (state) => {
+        state.isMutating = true;
         state.error = null;
       })
-      .addCase(fetchAllArticles.fulfilled, (state, action) => {
-        state.getLoading = false;
-        state.articles = action.payload?.articles ?? [];
-        state.pagination = action.payload?.pagination ?? null;
-        state.requestStatus = true;
+      .addCase(generateArticle.fulfilled, (state, action) => {
+        state.isMutating = false;
+        state.lastJobId = action.payload?.data?.jobId || null;
       })
-      .addCase(fetchAllArticles.rejected, (state, action) => {
-        state.getLoading = false;
+      .addCase(generateArticle.rejected, (state, action) => {
+        state.isMutating = false;
         state.error = action.payload;
       })
 
-      .addCase(fetchSingleArticle.pending, (state) => {
-        state.getLoading = true;
-        state.error = null;
+      .addCase(fetchArticles.pending, (state) => {
+        state.isLoading = true;
       })
-      .addCase(fetchSingleArticle.fulfilled, (state, action) => {
-        state.getLoading = false;
-        state.singleArticle = action.payload;
-        state.requestStatus = true;
+      .addCase(fetchArticles.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.list = action.payload?.data || [];
+        state.pagination = action.payload?.pagination || null;
       })
-      .addCase(fetchSingleArticle.rejected, (state, action) => {
-        state.getLoading = false;
+      .addCase(fetchArticles.rejected, (state, action) => {
+        state.isLoading = false;
         state.error = action.payload;
       })
 
-      .addCase(createNewArticle.pending, (state) => {
-        state.createLoading = true;
-        state.error = null;
-      })
-      .addCase(createNewArticle.fulfilled, (state, action) => {
-        state.createLoading = false;
-        state.articles.unshift(action.payload);
-        state.success = "Article created successfully!";
-        state.requestStatus = true;
-      })
-      .addCase(createNewArticle.rejected, (state, action) => {
-        state.createLoading = false;
-        state.error = action.payload;
+      .addCase(fetchArticleById.fulfilled, (state, action) => {
+        state.current = action.payload?.data?.article || null;
+        state.brief = action.payload?.data?.brief || null;
       })
 
-      .addCase(updateExistingArticle.pending, (state) => {
-        state.updateLoading = true;
-        state.error = null;
-      })
-      .addCase(updateExistingArticle.fulfilled, (state, action) => {
-        state.updateLoading = false;
-        state.articles = state.articles.map((a) =>
-          a.id === action.payload.id ? action.payload : a
-        );
-        state.success = "Article updated successfully!";
-        state.requestStatus = true;
-      })
-      .addCase(updateExistingArticle.rejected, (state, action) => {
-        state.updateLoading = false;
-        state.error = action.payload;
+      .addCase(saveArticleEdits.fulfilled, (state, action) => {
+        const article = action.payload?.data;
+        if (!article) return;
+        state.current = article;
+        const idx = state.list.findIndex((a) => a._id === article._id);
+        if (idx >= 0) state.list[idx] = article;
       })
 
-      .addCase(deleteArticleById.pending, (state) => {
-        state.deleteLoading = true;
-        state.error = null;
-      })
-      .addCase(deleteArticleById.fulfilled, (state, action) => {
-        state.deleteLoading = false;
-        state.articles = state.articles.filter(
-          (a) => a.id !== action.payload
-        );
-        state.success = "Article deleted successfully!";
-        state.requestStatus = true;
-      })
-      .addCase(deleteArticleById.rejected, (state, action) => {
-        state.deleteLoading = false;
-        state.error = action.payload;
+      .addCase(removeArticle.fulfilled, (state, action) => {
+        const { id } = action.payload || {};
+        state.list = state.list.filter((a) => a._id !== id);
       })
 
-      .addCase(publishArticleById.pending, (state) => {
-        state.updateLoading = true;
-      })
-      .addCase(publishArticleById.fulfilled, (state, action) => {
-        state.updateLoading = false;
-        state.articles = state.articles.map((a) =>
-          a.id === action.payload.id ? action.payload : a
-        );
-        state.success = "Article published!";
-        state.requestStatus = true;
-      })
-      .addCase(publishArticleById.rejected, (state, action) => {
-        state.updateLoading = false;
-        state.error = action.payload;
+      .addCase(publishArticle.fulfilled, (state, action) => {
+        const article = action.payload?.data?.article;
+        if (!article) return;
+        state.current = article;
+        const idx = state.list.findIndex((a) => a._id === article._id);
+        if (idx >= 0) state.list[idx] = article;
       })
 
-      .addCase(fetchArticleStatistics.fulfilled, (state, action) => {
-        state.statistics = action.payload;
+      .addCase(retryArticle.fulfilled, (state, action) => {
+        const data = action.payload?.data;
+        if (!data) return;
+        if (state.current?._id === data.articleId) {
+          state.current = {
+            ...state.current,
+            status: data.status,
+            failureReason: null,
+          };
+        }
+        const idx = state.list.findIndex((a) => a._id === data.articleId);
+        if (idx >= 0) {
+          state.list[idx] = {
+            ...state.list[idx],
+            status: data.status,
+            failureReason: null,
+          };
+        }
+        state.lastJobId = data.jobId || state.lastJobId;
+      })
+
+      .addCase(cancelArticle.fulfilled, (state, action) => {
+        const data = action.payload?.data;
+        if (!data) return;
+        if (state.current?._id === data.articleId) {
+          state.current = { ...state.current, status: data.status };
+        }
+        const idx = state.list.findIndex((a) => a._id === data.articleId);
+        if (idx >= 0) {
+          state.list[idx] = { ...state.list[idx], status: data.status };
+        }
+      })
+
+      .addCase(duplicateArticle.fulfilled, (state, action) => {
+        const newArticle = action.payload?.data;
+        if (!newArticle) return;
+        // Prepend so the user sees the copy at the top of the list.
+        state.list = [newArticle, ...state.list];
+      })
+
+      .addCase(fetchQuota.fulfilled, (state, action) => {
+        state.quota = action.payload?.data || null;
       });
   },
 });
 
-export const { clearArticleMessages } = articleSlice.actions;
+export const {
+  clearArticleError,
+  clearCurrentArticle,
+  receiveProgress,
+  receiveDone,
+  receiveFailed,
+} = articleSlice.actions;
 export default articleSlice.reducer;

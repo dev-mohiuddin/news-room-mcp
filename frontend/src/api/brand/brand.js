@@ -1,16 +1,21 @@
 import { API, handleRequest } from "@/lib/http";
 
-export const getBrandVoices = (query = "") =>
-  handleRequest(() => API.get(`/api/brand-voices${query}`));
+const BASE = "/api/v1/brand-voice";
 
-export const getSingleBrandVoice = (id) =>
-  handleRequest(() => API.get(`/api/brand-voices/${id}`));
+export const listBrandVoicesApi = () =>
+  handleRequest(() => API.get(BASE));
 
-export const createBrandVoice = (data) =>
-  handleRequest(() => API.post(`/api/brand-voices`, data));
+export const getBrandVoiceApi = (id) =>
+  handleRequest(() => API.get(`${BASE}/${id}`));
 
-export const updateBrandVoice = (id, data) =>
-  handleRequest(() => API.put(`/api/brand-voices/${id}`, data));
+export const createBrandVoiceApi = (payload) =>
+  handleRequest(() => API.post(BASE, payload));
 
-export const deleteBrandVoice = (id) =>
-  handleRequest(() => API.delete(`/api/brand-voices/${id}`));
+export const reExtractBrandVoiceApi = (id) =>
+  handleRequest(() => API.post(`${BASE}/${id}/re-extract`));
+
+export const activateBrandVoiceApi = (id) =>
+  handleRequest(() => API.post(`${BASE}/${id}/activate`));
+
+export const deleteBrandVoiceApi = (id) =>
+  handleRequest(() => API.delete(`${BASE}/${id}`));

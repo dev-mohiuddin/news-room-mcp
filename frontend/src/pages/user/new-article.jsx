@@ -1,37 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  FileText,
-  Edit,
-  TrendingUp,
-  Rocket,
-  Sparkles,
-  ArrowLeft,
-  ArrowRight,
-  Save,
-  Check,
-  Plus,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Upload,
-  Calendar,
-} from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import {
+  Search,
+  ArrowRight,
+  Sparkles,
+  Plus,
+  X,
+  Zap,
+  Eye,
+  Rocket,
+} from "lucide-react";
 
 import PageHeader from "@/components/shared/PageHeader";
 import GlassCard from "@/components/shared/GlassCard";
 import GradientButton from "@/components/shared/GradientButton";
-import SourceCard from "@/components/user/SourceCard";
-import WizardStepper from "@/components/user/WizardStepper";
-import EditorToolbar from "@/components/user/EditorToolbar";
-import SeoScoreRing from "@/components/user/SeoScoreRing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -40,408 +31,620 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fadeUp } from "@/lib/animations";
+
+import GenerationProgress from "@/components/user/GenerationProgress";
+import PublishDialog from "@/components/user/PublishDialog";
+
 import {
-  RESEARCH_SOURCES,
-  RESEARCH_BRIEF,
-  SEO_CHECKS,
-  META_TITLE_OPTIONS,
-  FAQ_GENERATED,
-  MY_CMS_CONNECTIONS,
-} from "@/lib/mockData";
+  generateArticle,
+  fetchArticleById,
+  fetchQuota,
+  clearCurrentArticle,
+} from "@/redux/slice/article-slice";
+import { fetchBrandVoices } from "@/redux/slice/brand-slice";
+import { fadeUp, staggerContainer } from "@/lib/animations";
+import { formatNumber } from "@/lib/utils";
 
-const STEPS = [
-  { id: "research", label: "Research", hint: "Find sources", icon: Search },
-  { id: "outline", label: "Outline", hint: "Structure", icon: FileText },
-  { id: "draft", label: "Draft", hint: "AI writes", icon: Edit },
-  { id: "seo", label: "SEO", hint: "Optimize", icon: TrendingUp },
-  { id: "publish", label: "Publish", hint: "Go live", icon: Rocket },
-];
+/* ──────────────────────────────────────────────────────────
+ *  Validation
+ * ────────────────────────────────────────────────────────── */
+const TONES = ["Professional", "Casual", "Journalistic", "Academic"];
 
+const submitSchema = z.object({
+  topic: z
+    .string()
+    .trim()
+    .min(3, "Topic must be at least 3 characters")
+    .max(200, "Topic too long"),
+  targetKeyword: z
+    .string()
+    .trim()
+    .min(2, "Target keyword required")
+    .max(100, "Keyword too long"),
+  tone: z.enum(TONES),
+  targetWordCount: z.number().int().min(300).max(5000),
+});
+
+/* ──────────────────────────────────────────────────────────
+ *  Page
+ * ────────────────────────────────────────────────────────── */
 export default function NewArticlePage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
+  const dispatch = useDispatch();
 
-  const next = () => setStep((s) => Math.min(5, s + 1));
-  const prev = () => setStep((s) => Math.max(1, s - 1));
+  const quota = useSelector((s) => s.articles.quota);
+  const brandVoices = useSelector((s) => s.brand.list);
+  const activeVoice = brandVoices.find((p) => p.isActive) || null;
+  const currentArticle = useSelector((s) => s.articles.current);
+  const liveProgress = useSelector((s) =>
+    currentArticle?._id
+      ? s.articles?.progress?.[currentArticle._id]
+      : null
+  );
+
+  const [submittedArticleId, setSubmittedArticleId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [extraKeywords, setExtraKeywords] = useState([]);
+  const [extraKeywordInput, setExtraKeywordInput] = useState("");
+  const [publishOpen, setPublishOpen] = useState(false);
+
+  const form = useForm({
+    resolver: zodResolver(submitSchema),
+    defaultValues: {
+      topic: "",
+      targetKeyword: "",
+      tone: "Professional",
+      targetWordCount: 1500,
+    },
+  });
+
+  /* Initial load */
+  useEffect(() => {
+    dispatch(fetchQuota());
+    dispatch(fetchBrandVoices());
+    return () => dispatch(clearCurrentArticle());
+  }, [dispatch]);
+
+  /* Re-fetch the article when live progress reaches a settled state */
+  useEffect(() => {
+    if (!submittedArticleId) return;
+    const status = liveProgress?.status;
+    if (
+      status === "draft_ready" ||
+      status === "published" ||
+      status === "failed" ||
+      status === "needs_revision"
+    ) {
+      dispatch(fetchArticleById(submittedArticleId));
+    }
+  }, [liveProgress?.status, submittedArticleId, dispatch]);
+
+  /* Poll-as-fallback every 8s while in progress (in case socket dies) */
+  useEffect(() => {
+    if (!submittedArticleId) return undefined;
+    const status = liveProgress?.status;
+    const settled = ["draft_ready", "published", "failed", "needs_revision"].includes(
+      status
+    );
+    if (settled) return undefined;
+    const t = setInterval(() => {
+      dispatch(fetchArticleById(submittedArticleId));
+    }, 8000);
+    return () => clearInterval(t);
+  }, [submittedArticleId, liveProgress?.status, dispatch]);
+
+  const handleAddKeyword = () => {
+    const k = extraKeywordInput.trim();
+    if (!k) return;
+    if (extraKeywords.length >= 10) {
+      toast.error("Maximum 10 additional keywords");
+      return;
+    }
+    if (extraKeywords.includes(k)) {
+      setExtraKeywordInput("");
+      return;
+    }
+    setExtraKeywords((prev) => [...prev, k]);
+    setExtraKeywordInput("");
+  };
+
+  const removeKeyword = (k) =>
+    setExtraKeywords((prev) => prev.filter((x) => x !== k));
+
+  const onSubmit = async (data) => {
+    setSubmitting(true);
+    try {
+      const result = await dispatch(
+        generateArticle({
+          topic: data.topic,
+          targetKeyword: data.targetKeyword,
+          tone: data.tone,
+          targetWordCount: data.targetWordCount,
+          ...(extraKeywords.length
+            ? { additionalKeywords: extraKeywords }
+            : {}),
+        })
+      ).unwrap();
+
+      const articleId = result?.data?.articleId;
+      if (!articleId) {
+        toast.error("Could not start generation");
+        return;
+      }
+      setSubmittedArticleId(articleId);
+      // Eagerly load the article so progress card has a record to update.
+      dispatch(fetchArticleById(articleId));
+      // Refresh quota (it just decremented)
+      dispatch(fetchQuota());
+      toast.success("Generation queued. Watch the progress below.");
+    } catch (err) {
+      toast.error(typeof err === "string" ? err : err?.message || "Generation failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleStartOver = () => {
+    setSubmittedArticleId(null);
+    dispatch(clearCurrentArticle());
+    form.reset({
+      topic: "",
+      targetKeyword: "",
+      tone: "Professional",
+      targetWordCount: 1500,
+    });
+    setExtraKeywords([]);
+  };
+
+  const status = currentArticle?.status;
+  const showForm = !submittedArticleId;
+  const showProgress = submittedArticleId && status !== "draft_ready" && status !== "published";
+  const showResult = submittedArticleId && (status === "draft_ready" || status === "published");
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Create"
         title="New Article"
-        subtitle="From research to published — 5 steps."
+        subtitle="Submit a topic, watch our AI research, write, and SEO-optimize it for you in real time."
         actions={
-          <Button variant="glass" size="sm" onClick={() => toast.success("Draft saved")}>
-            <Save className="h-4 w-4" /> Save draft
-          </Button>
+          quota ? (
+            <QuotaBadge quota={quota} />
+          ) : null
         }
       />
 
-      <WizardStepper steps={STEPS} current={step} onStepClick={setStep} />
-
       <AnimatePresence mode="wait">
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          transition={{ duration: 0.25 }}
-        >
-          {step === 1 && <StepResearch />}
-          {step === 2 && <StepOutline />}
-          {step === 3 && <StepDraft />}
-          {step === 4 && <StepSEO />}
-          {step === 5 && <StepPublish onPublish={() => { toast.success("Article published!"); navigate("/dashboard/articles"); }} />}
-        </motion.div>
+        {showForm && (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+          >
+            <SubmitForm
+              form={form}
+              extraKeywords={extraKeywords}
+              extraKeywordInput={extraKeywordInput}
+              setExtraKeywordInput={setExtraKeywordInput}
+              addKeyword={handleAddKeyword}
+              removeKeyword={removeKeyword}
+              onSubmit={form.handleSubmit(onSubmit)}
+              submitting={submitting}
+              quota={quota}
+              activeVoice={activeVoice}
+            />
+          </motion.div>
+        )}
+
+        {showProgress && (
+          <motion.div
+            key="progress"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="space-y-4"
+          >
+            <GenerationProgress
+              articleId={submittedArticleId}
+              status={status}
+              failureReason={currentArticle?.failureReason}
+            />
+            {currentArticle && (
+              <div className="text-xs text-muted-foreground text-center">
+                Article ID:{" "}
+                <code className="bg-white/5 px-1.5 py-0.5 rounded">
+                  {currentArticle._id}
+                </code>
+              </div>
+            )}
+            {(status === "failed" || status === "needs_revision") && (
+              <div className="flex justify-center gap-2">
+                <Button variant="glass" onClick={handleStartOver}>
+                  Start over
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    navigate(`/dashboard/articles/${submittedArticleId}`)
+                  }
+                >
+                  Open article detail <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {showResult && currentArticle && (
+          <motion.div
+            key="result"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+          >
+            <ResultPanel
+              article={currentArticle}
+              onPublish={() => setPublishOpen(true)}
+              onOpenDetail={() =>
+                navigate(`/dashboard/articles/${currentArticle._id}`)
+              }
+              onStartOver={handleStartOver}
+            />
+          </motion.div>
+        )}
       </AnimatePresence>
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between pt-4 border-t border-white/10">
-        <Button variant="ghost" onClick={prev} disabled={step === 1}>
-          <ArrowLeft className="h-4 w-4" /> Previous
-        </Button>
-        <span className="text-xs text-muted-foreground">Step {step} of 5</span>
-        {step < 5 ? (
-          <GradientButton size="md" onClick={next}>
-            Next <ArrowRight className="h-4 w-4" />
-          </GradientButton>
-        ) : (
-          <span />
-        )}
-      </div>
+      <PublishDialog
+        open={publishOpen}
+        onOpenChange={setPublishOpen}
+        article={currentArticle}
+      />
     </div>
   );
 }
 
-/* ─── Step 1: Research ─── */
-function StepResearch() {
-  const [topic, setTopic] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [depth, setDepth] = useState("deep");
-  const [sources, setSources] = useState([]);
-  const [selected, setSelected] = useState([]);
-  const [brief, setBrief] = useState(null);
-
-  const search = () => { setSources(RESEARCH_SOURCES); setSelected([]); setBrief(null); toast.success("8 sources found"); };
-  const genBrief = () => { setBrief(RESEARCH_BRIEF); toast.success("Brief generated"); };
-  const toggle = (id) => setSelected((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]);
+/* ──────────────────────────────────────────────────────────
+ *  Submit form
+ * ────────────────────────────────────────────────────────── */
+function SubmitForm({
+  form,
+  extraKeywords,
+  extraKeywordInput,
+  setExtraKeywordInput,
+  addKeyword,
+  removeKeyword,
+  onSubmit,
+  submitting,
+  quota,
+  activeVoice,
+}) {
+  const errors = form.formState.errors;
+  const wordCountValue = form.watch("targetWordCount");
 
   return (
-    <div className="space-y-4">
-      <GlassCard className="p-5">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-          <div className="md:col-span-4">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Topic</Label>
-            <Input value={topic} onChange={(e) => setTopic(e.target.value)} className="mt-1.5 bg-transparent border-white/10" placeholder="e.g. AI content marketing" />
+    <motion.form
+      onSubmit={onSubmit}
+      variants={staggerContainer(0.05)}
+      initial="hidden"
+      animate="visible"
+      className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+    >
+      <GlassCard className="p-4 md:p-6 lg:col-span-2 space-y-5">
+        {/* Active brand voice indicator */}
+        <motion.div variants={fadeUp}>
+          {activeVoice ? (
+            <div className="flex items-center gap-2.5 p-2.5 rounded-lg glass border border-primary/20 bg-primary/5">
+              <span className="h-7 w-7 rounded-md gradient-bg flex items-center justify-center shrink-0">
+                <Sparkles className="h-3.5 w-3.5 text-white" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate">
+                  Writing in voice:{" "}
+                  <span className="text-primary">{activeVoice.name}</span>
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  Switch profiles on the Brand Voice page.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5 p-2.5 rounded-lg glass border border-white/10">
+              <span className="h-7 w-7 rounded-md glass border border-white/10 flex items-center justify-center shrink-0">
+                <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs">
+                  No brand voice active{" "}
+                  <a
+                    href="/dashboard/brand-voice"
+                    className="text-primary hover:underline"
+                  >
+                    create one
+                  </a>{" "}
+                  for consistent tone across articles.
+                </p>
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div variants={fadeUp}>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+            Topic
+          </Label>
+          <Input
+            {...form.register("topic")}
+            className="mt-1.5 bg-transparent border-white/10 text-base"
+            placeholder="e.g. The future of AI-powered content workflows"
+          />
+          {errors.topic && (
+            <p className="text-xs text-destructive mt-1.5">
+              {errors.topic.message}
+            </p>
+          )}
+        </motion.div>
+
+        <motion.div variants={fadeUp}>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+            Target keyword
+          </Label>
+          <Input
+            {...form.register("targetKeyword")}
+            className="mt-1.5 bg-transparent border-white/10"
+            placeholder="ai content workflow"
+          />
+          {errors.targetKeyword && (
+            <p className="text-xs text-destructive mt-1.5">
+              {errors.targetKeyword.message}
+            </p>
+          )}
+        </motion.div>
+
+        <motion.div variants={fadeUp}>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+            Additional keywords (optional)
+          </Label>
+          <div className="flex gap-2 mt-1.5">
+            <Input
+              value={extraKeywordInput}
+              onChange={(e) => setExtraKeywordInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addKeyword();
+                }
+              }}
+              className="bg-transparent border-white/10"
+              placeholder="Press Enter to add"
+            />
+            <Button
+              type="button"
+              variant="glass"
+              size="icon"
+              onClick={addKeyword}
+              disabled={extraKeywords.length >= 10}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="md:col-span-3">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Keyword</Label>
-            <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} className="mt-1.5 bg-transparent border-white/10" placeholder="target keyword" />
-          </div>
-          <div className="md:col-span-2">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Depth</Label>
-            <Select value={depth} onValueChange={setDepth}>
-              <SelectTrigger className="mt-1.5 bg-transparent border-white/10"><SelectValue /></SelectTrigger>
+          {extraKeywords.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-3">
+              {extraKeywords.map((k) => (
+                <Badge
+                  key={k}
+                  variant="outline"
+                  className="text-xs gap-1 cursor-pointer"
+                  onClick={() => removeKeyword(k)}
+                >
+                  {k}
+                  <X className="h-3 w-3" />
+                </Badge>
+              ))}
+            </div>
+          )}
+        </motion.div>
+
+        <motion.div variants={fadeUp} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Tone
+            </Label>
+            <Select
+              value={form.watch("tone")}
+              onValueChange={(v) => form.setValue("tone", v)}
+            >
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="quick">Quick (3)</SelectItem>
-                <SelectItem value="deep">Deep (10)</SelectItem>
-                <SelectItem value="comprehensive">Full (20)</SelectItem>
+                {TONES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    {t}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="md:col-span-3">
-            <GradientButton className="w-full" onClick={search}><Search className="h-4 w-4" /> Search</GradientButton>
-          </div>
-        </div>
-      </GlassCard>
-
-      {sources.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 space-y-3 max-h-[500px] overflow-y-auto pr-1">
-            {sources.map((s) => (
-              <SourceCard key={s.id} source={s} selected={selected.includes(s.id)} onToggle={toggle} />
-            ))}
-          </div>
-          <GlassCard className="p-5 h-fit sticky top-0">
-            <p className="text-xs text-muted-foreground mb-3">{selected.length} sources selected</p>
-            <GradientButton className="w-full" size="md" onClick={genBrief} disabled={!selected.length}>
-              <Sparkles className="h-4 w-4" /> Generate brief
-            </GradientButton>
-            {brief && (
-              <div className="mt-4 p-3 rounded-lg glass border border-white/5 text-xs space-y-2">
-                <p className="font-semibold">{brief.title}</p>
-                <p className="text-muted-foreground leading-relaxed">{brief.thesis}</p>
-              </div>
-            )}
-          </GlassCard>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Step 2: Outline ─── */
-function StepOutline() {
-  const [sections, setSections] = useState([
-    "Introduction — Hook + thesis",
-    "1. Topical Authority Over Single Keywords",
-    "2. AI Overview Optimization",
-    "3. Internal Linking Architecture",
-    "4. Content Freshness Signals",
-    "5. Schema Markup (FAQ, HowTo, Article)",
-    "6. E-E-A-T Signals",
-    "7. Core Web Vitals",
-    "8. Long-Form Depth + Readability",
-    "9. Featured Snippet Targeting",
-    "10. Consistent Publishing Cadence",
-    "Conclusion — Summary + CTA",
-  ]);
-  const [wordCount, setWordCount] = useState("1500");
-  const [tone, setTone] = useState("professional");
-
-  const move = (i, dir) => {
-    const arr = [...sections];
-    const j = i + dir;
-    if (j < 0 || j >= arr.length) return;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-    setSections(arr);
-  };
-  const remove = (i) => setSections((s) => s.filter((_, idx) => idx !== i));
-  const add = () => setSections((s) => [...s, "New section"]);
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <GlassCard className="p-5 lg:col-span-2">
-        <h3 className="font-display text-lg mb-4">Article outline</h3>
-        <ul className="space-y-2">
-          {sections.map((s, i) => (
-            <li key={i} className="flex items-center gap-2 p-2.5 rounded-lg glass border border-white/5 group">
-              <span className="text-xs text-muted-foreground w-6 text-center tabular-nums">{i + 1}</span>
-              <Input value={s} onChange={(e) => { const arr = [...sections]; arr[i] = e.target.value; setSections(arr); }} className="flex-1 h-8 text-sm bg-transparent border-0 shadow-none focus-visible:ring-0 px-1" />
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(i, -1)} disabled={i === 0}><ChevronUp className="h-3 w-3" /></Button>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => move(i, 1)} disabled={i === sections.length - 1}><ChevronDown className="h-3 w-3" /></Button>
-                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => remove(i)}><Trash2 className="h-3 w-3" /></Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <Button variant="glass" size="sm" className="mt-3" onClick={add}><Plus className="h-3.5 w-3.5" /> Add section</Button>
-      </GlassCard>
-
-      <GlassCard className="p-5 h-fit space-y-4">
-        <div>
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Target word count</Label>
-          <Select value={wordCount} onValueChange={setWordCount}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="500">~500 words</SelectItem>
-              <SelectItem value="1000">~1,000 words</SelectItem>
-              <SelectItem value="1500">~1,500 words</SelectItem>
-              <SelectItem value="2000">~2,000 words</SelectItem>
-              <SelectItem value="3000">~3,000 words</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Writing tone</Label>
-          <Select value={tone} onValueChange={setTone}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="professional">Professional</SelectItem>
-              <SelectItem value="casual">Casual</SelectItem>
-              <SelectItem value="journalistic">Journalistic</SelectItem>
-              <SelectItem value="academic">Academic</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <GradientButton className="w-full" onClick={() => toast.success("Generating draft…")}>
-          <Sparkles className="h-4 w-4" /> Generate draft
-        </GradientButton>
-      </GlassCard>
-    </div>
-  );
-}
-
-/* ─── Step 3: Draft ─── */
-function StepDraft() {
-  return (
-    <div className="space-y-4">
-      <EditorToolbar />
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        <GlassCard className="p-5 lg:col-span-3">
-          <Input defaultValue="10 SEO Strategies That Work in 2026" className="text-xl font-display border-0 shadow-none px-0 focus-visible:ring-0 bg-transparent mb-4" />
-          <Textarea
-            rows={22}
-            className="border-0 shadow-none px-0 focus-visible:ring-0 bg-transparent text-sm leading-relaxed resize-none"
-            defaultValue={`Search engines have changed. Modern SEO is no longer about keyword stuffing or link farms. The strategies that move the needle today center on intent, depth, and AI-readable structure.\n\nIn this article, we walk through the ten approaches our team has measured across 800+ articles in the past 12 months.\n\n## 1. Topical Authority Over Single Keywords\n\nGoogle's algorithms now evaluate your site's expertise on a topic, not just individual page relevance. Building content clusters — a pillar page surrounded by supporting articles — signals depth.\n\n## 2. AI Overview Optimization\n\nWith AI overviews appearing on 38% of queries, structuring content for citation is critical. Use clear headings, factual statements, and schema markup.\n\n## 3. Internal Linking Architecture\n\nOur testing shows that adding 4-6 contextual internal links per article produces a measurable ranking lift within 2-3 weeks.\n\n## 4. Content Freshness Signals\n\nUpdating existing articles with new data, examples, and timestamps outperforms publishing new thin content.\n\n## 5. Schema Markup\n\nPages with FAQ schema see +27% AI overview inclusion. Article schema helps Google understand authorship.`}
-          />
-        </GlassCard>
-        <div className="space-y-4">
-          <GlassCard className="p-4">
-            <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Live stats</h4>
-            <dl className="space-y-2 text-sm">
-              <div className="flex justify-between"><dt className="text-muted-foreground">Words</dt><dd className="font-medium tabular-nums">1,420</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Reading time</dt><dd>6 min</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Flesch score</dt><dd>62 (Standard)</dd></div>
-              <div className="flex justify-between"><dt className="text-muted-foreground">Paragraphs</dt><dd className="tabular-nums">14</dd></div>
-            </dl>
-          </GlassCard>
-          <GlassCard className="p-4">
-            <p className="text-xs text-emerald-400 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-dot" />
-              Auto-saved 4s ago
-            </p>
-          </GlassCard>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── Step 4: SEO ─── */
-function StepSEO() {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <GlassCard className="p-6 flex flex-col items-center justify-center">
-        <SeoScoreRing score={94} />
-        <p className="text-xs text-muted-foreground mt-3">{SEO_CHECKS.filter((c) => c.status === "pass").length}/{SEO_CHECKS.length} checks passed</p>
-      </GlassCard>
-
-      <GlassCard className="p-5 lg:col-span-2">
-        <h3 className="font-display text-lg mb-3">Checklist</h3>
-        <ul className="space-y-2">
-          {SEO_CHECKS.map((c) => (
-            <li key={c.id} className="flex items-center gap-2 text-sm">
-              <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${c.status === "pass" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
-                {c.status === "pass" ? "✓" : "!"}
-              </span>
-              <span className={c.status === "pass" ? "text-muted-foreground" : ""}>{c.label}</span>
-            </li>
-          ))}
-        </ul>
-      </GlassCard>
-
-      <GlassCard className="p-5 lg:col-span-3">
-        <h3 className="font-display text-lg mb-3">Meta title options (pick one)</h3>
-        <div className="space-y-2">
-          {META_TITLE_OPTIONS.map((t, i) => (
-            <div key={i} className="flex items-center gap-3 p-3 rounded-lg glass border border-white/5 hover:border-primary/30 cursor-pointer transition-colors">
-              <span className="h-6 w-6 rounded-full gradient-bg flex items-center justify-center text-[10px] text-white font-bold">{i + 1}</span>
-              <span className="text-sm flex-1">{t}</span>
-              <span className="text-xs text-muted-foreground tabular-nums">{t.length} chars</span>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
-
-      <GlassCard className="p-5 lg:col-span-3">
-        <h3 className="font-display text-lg mb-3">Generated FAQ ({FAQ_GENERATED.length})</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {FAQ_GENERATED.map((f, i) => (
-            <div key={i} className="p-3 rounded-lg glass border border-white/5">
-              <p className="text-sm font-medium">{f.q}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{f.a}</p>
-            </div>
-          ))}
-        </div>
-      </GlassCard>
-    </div>
-  );
-}
-
-/* ─── Step 5: Publish ─── */
-function StepPublish({ onPublish }) {
-  const [cms, setCms] = useState("cms1");
-  const [mode, setMode] = useState("now");
-  const connected = MY_CMS_CONNECTIONS.filter((c) => c.status === "connected");
-
-  const checks = [
-    { label: "SEO score above 80", ok: true },
-    { label: "Meta title set", ok: true },
-    { label: "Meta description set", ok: true },
-    { label: "Featured image set", ok: false },
-    { label: "Word count > 1,000", ok: true },
-  ];
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <GlassCard className="p-5 space-y-5">
-        <div>
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Publish to</Label>
-          <Select value={cms} onValueChange={setCms}>
-            <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {connected.map((c) => (
-                <SelectItem key={c.id} value={c.id}>{c.platform} — {c.siteUrl}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Publish mode</Label>
-          <div className="grid grid-cols-3 gap-2 mt-1.5">
-            {[
-              { v: "draft", l: "Draft", d: "Save as CMS draft" },
-              { v: "now", l: "Publish now", d: "Go live immediately" },
-              { v: "schedule", l: "Schedule", d: "Pick date & time" },
-            ].map((m) => (
-              <button
-                key={m.v}
-                type="button"
-                onClick={() => setMode(m.v)}
-                className={`p-3 rounded-lg text-left transition-all ${mode === m.v ? "glass border border-primary/40 ring-2 ring-primary/20" : "glass border border-white/10 hover:border-white/20"}`}
-              >
-                <p className="text-sm font-medium">{m.l}</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{m.d}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {mode === "schedule" && (
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" /> Schedule date & time
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Word count
             </Label>
-            <Input type="datetime-local" className="mt-1.5" />
+            <Select
+              value={String(wordCountValue)}
+              onValueChange={(v) => form.setValue("targetWordCount", Number(v))}
+            >
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="500">500</SelectItem>
+                <SelectItem value="1000">1,000</SelectItem>
+                <SelectItem value="1500">1,500 (recommended)</SelectItem>
+                <SelectItem value="2000">2,000</SelectItem>
+                <SelectItem value="3000">3,000</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-        )}
+        </motion.div>
 
-        <div>
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">Featured image</Label>
-          <div className="mt-1.5 h-32 rounded-xl glass border border-dashed border-white/15 flex flex-col items-center justify-center text-xs text-muted-foreground hover:border-white/30 cursor-pointer">
-            <Upload className="h-5 w-5 mb-2" />
-            <p>Drop image or click to upload</p>
-          </div>
-        </div>
+        <motion.div variants={fadeUp} className="pt-4 border-t border-white/5">
+          <GradientButton
+            type="submit"
+            size="lg"
+            className="w-full"
+            disabled={submitting || (quota && quota.remaining === 0)}
+          >
+            <Sparkles className="h-5 w-5" />
+            {submitting ? "Queueing…" : "Generate article"}
+          </GradientButton>
+          {quota && quota.remaining === 0 && (
+            <p className="text-xs text-amber-400 text-center mt-2">
+              Monthly quota reached — upgrade your plan to keep generating.
+            </p>
+          )}
+        </motion.div>
       </GlassCard>
 
-      <div className="space-y-4">
-        <GlassCard className="p-5">
-          <h3 className="font-display text-lg mb-4">Pre-publish checklist</h3>
-          <ul className="space-y-2">
-            {checks.map((c) => (
-              <li key={c.label} className="flex items-center gap-2 text-sm">
-                <span className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold ${c.ok ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"}`}>
-                  {c.ok ? "✓" : "!"}
+      {/* Side panel — what happens next */}
+      <motion.div variants={fadeUp}>
+        <GlassCard className="p-5 space-y-4 h-full">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground">
+            <Zap className="h-3.5 w-3.5 text-primary" />
+            How generation works
+          </div>
+          <ol className="space-y-3 text-sm">
+            {[
+              ["Research", "We search 5+ sources, scrape, dedupe."],
+              ["Outline", "Claude Sonnet builds a structured outline."],
+              ["Draft", "Full article drafted with inline citations."],
+              ["SEO", "Meta titles, slug, FAQ generated by Haiku."],
+              ["Originality", "Score check + 12-token verbatim guard."],
+            ].map(([t, d], i) => (
+              <li key={t} className="flex gap-3">
+                <span className="h-6 w-6 rounded-full glass border border-white/10 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                  {i + 1}
                 </span>
-                <span className={c.ok ? "text-muted-foreground" : ""}>{c.label}</span>
+                <div>
+                  <p className="font-medium leading-tight">{t}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{d}</p>
+                </div>
               </li>
             ))}
-          </ul>
-          <p className="text-xs text-muted-foreground mt-3">
-            {checks.filter((c) => c.ok).length}/{checks.length} checks passed
-          </p>
+          </ol>
+          <div className="pt-3 border-t border-white/5 text-xs text-muted-foreground">
+            Typical end-to-end time: 2-5 minutes for a 1,500-word article.
+          </div>
         </GlassCard>
+      </motion.div>
+    </motion.form>
+  );
+}
 
-        <GradientButton className="w-full" size="lg" onClick={onPublish}>
-          <Rocket className="h-5 w-5" />
-          {mode === "draft" ? "Save as draft" : mode === "schedule" ? "Schedule publish" : "Publish now"}
-        </GradientButton>
-      </div>
+/* ──────────────────────────────────────────────────────────
+ *  Result panel — shown when status reaches draft_ready
+ * ────────────────────────────────────────────────────────── */
+function ResultPanel({ article, onPublish, onOpenDetail, onStartOver }) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <GlassCard className="p-4 md:p-6 lg:col-span-2 space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-emerald-400" />
+          <h3 className="font-display text-xl">Your draft is ready</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          {formatNumber(article.wordCount || 0)} words ·{" "}
+          {article.readingTimeMinutes || 0} min read · cost{" "}
+          {article.costs?.totalUsd
+            ? `$${Number(article.costs.totalUsd).toFixed(4)}`
+            : "$0.00"}
+        </p>
+
+        <div className="rounded-lg p-4 glass border border-white/5">
+          <h4 className="font-display text-lg leading-tight">
+            {article.seo?.metaTitle || article.topic}
+          </h4>
+          {article.seo?.metaDescription && (
+            <p className="text-sm text-muted-foreground mt-2">
+              {article.seo.metaDescription}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 pt-2">
+          <GradientButton size="md" onClick={onPublish}>
+            <Rocket className="h-4 w-4" /> Publish to CMS
+          </GradientButton>
+          <Button variant="glass" size="md" onClick={onOpenDetail}>
+            <Eye className="h-4 w-4" /> Review full article
+          </Button>
+          <Button variant="ghost" size="md" onClick={onStartOver}>
+            Generate another
+          </Button>
+        </div>
+      </GlassCard>
+
+      {/* Sources preview */}
+      <GlassCard className="p-5 space-y-3">
+        <h4 className="text-xs uppercase tracking-widest text-muted-foreground">
+          Cited sources ({article.sourcesIndex?.length || 0})
+        </h4>
+        <ul className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+          {(article.sourcesIndex || []).map((s) => (
+            <li
+              key={s.numeral}
+              className="text-xs p-2 rounded glass border border-white/5"
+            >
+              <span className="text-primary font-bold tabular-nums mr-1">
+                [{s.numeral}]
+              </span>
+              <a
+                href={s.url}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:underline truncate block"
+                title={s.url}
+              >
+                {s.url}
+              </a>
+            </li>
+          ))}
+          {!(article.sourcesIndex || []).length && (
+            <li className="text-xs italic text-muted-foreground">
+              No sources indexed.
+            </li>
+          )}
+        </ul>
+      </GlassCard>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────
+ *  Quota badge
+ * ────────────────────────────────────────────────────────── */
+function QuotaBadge({ quota }) {
+  if (!quota) return null;
+  const remaining =
+    quota.remaining === null ? "Unlimited" : quota.remaining;
+  const total = quota.limit === null ? "∞" : quota.limit;
+  const isLow =
+    quota.remaining !== null &&
+    quota.limit > 0 &&
+    quota.remaining / quota.limit <= 0.2;
+  return (
+    <div className="text-xs glass border border-white/10 rounded-lg px-3 py-1.5 flex items-center gap-2">
+      <Zap
+        className={`h-3.5 w-3.5 ${
+          isLow ? "text-amber-400" : "text-brand-teal"
+        }`}
+      />
+      <span className="capitalize text-muted-foreground">
+        {quota.planDisplayName || quota.plan}
+      </span>
+      <span className="tabular-nums font-medium">
+        {remaining}/{total}
+      </span>
     </div>
   );
 }

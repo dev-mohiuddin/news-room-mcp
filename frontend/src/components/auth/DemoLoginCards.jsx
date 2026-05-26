@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { motion } from "framer-motion";
-import { Shield, Sparkles, Zap, ArrowRight } from "lucide-react";
+import { Shield, Sparkles, Crown, Zap, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { signInUser } from "@/redux/slice/auth-slice";
@@ -11,7 +11,7 @@ import { getRedirectFor } from "@/lib/permissions";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { cn } from "@/lib/utils";
 
-const ICONS = { shield: Shield, sparkles: Sparkles };
+const ICONS = { shield: Shield, sparkles: Sparkles, crown: Crown };
 
 /**
  * DemoLoginCards — one-click login using the seeded demo accounts.

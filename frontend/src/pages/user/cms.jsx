@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 import {
   Globe,
   Plus,
@@ -6,12 +9,9 @@ import {
   XCircle,
   RefreshCw,
   Trash2,
-  Star,
-  Edit,
   Plug,
+  AlertCircle,
 } from "lucide-react";
-import { motion } from "framer-motion";
-import { toast } from "sonner";
 
 import PageHeader from "@/components/shared/PageHeader";
 import GlassCard from "@/components/shared/GlassCard";
@@ -29,71 +29,50 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  fetchCmsConnections,
+  addWordpressConnection,
+  testCms,
+  deleteCms,
+} from "@/redux/slice/cms-slice";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { dateFormater } from "@/lib/utils";
-import { MY_CMS_CONNECTIONS } from "@/lib/mockData";
-
-const PLATFORM_COLORS = {
-  WordPress: "from-blue-600 to-blue-400",
-  Ghost: "from-slate-600 to-slate-400",
-  Notion: "from-neutral-700 to-neutral-500",
-  Contentful: "from-blue-500 to-cyan-400",
-  Sanity: "from-red-500 to-orange-400",
-};
 
 export default function CMSPage() {
-  const [connections, setConnections] = useState(MY_CMS_CONNECTIONS);
+  const dispatch = useDispatch();
+  const { connections, isLoading } = useSelector((s) => s.cms);
+
   const [connectOpen, setConnectOpen] = useState(false);
   const [disconnectTarget, setDisconnectTarget] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
-  const testConnection = (id) => {
-    toast.loading("Testing connection…", { id });
-    setTimeout(() => {
-      setConnections((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, lastSync: new Date().toISOString() } : c))
-      );
-      toast.success("Connection OK", { id });
-    }, 800);
-  };
+  useEffect(() => {
+    dispatch(fetchCmsConnections());
+  }, [dispatch]);
 
-  const setDefault = (id) => {
-    setConnections((prev) =>
-      prev.map((c) => ({ ...c, default: c.id === id }))
-    );
-    toast.success("Default CMS updated");
-  };
-
-  const handleDisconnect = () => {
-    if (disconnectTarget) {
-      setConnections((prev) =>
-        prev.map((c) =>
-          c.id === disconnectTarget.id
-            ? { ...c, status: "disconnected", siteUrl: "—", lastSync: null, default: false }
-            : c
-        )
-      );
-      toast.success(`${disconnectTarget.platform} disconnected`);
+  const onTest = async (id) => {
+    setBusyId(id);
+    try {
+      await dispatch(testCms(id)).unwrap();
+      toast.success("Connection verified");
+    } catch (err) {
+      toast.error(err || "Connection test failed");
+    } finally {
+      setBusyId(null);
     }
-    setDisconnectTarget(null);
   };
 
-  const handleConnect = (platform, url, key) => {
-    setConnections((prev) =>
-      prev.map((c) =>
-        c.platform === platform
-          ? { ...c, status: "connected", siteUrl: url, lastSync: new Date().toISOString() }
-          : c
-      )
-    );
-    setConnectOpen(false);
-    toast.success(`${platform} connected`);
+  const onDisconnect = async () => {
+    if (!disconnectTarget) return;
+    try {
+      await dispatch(deleteCms(disconnectTarget._id)).unwrap();
+      toast.success(`${disconnectTarget.siteUrl} disconnected`);
+    } catch (err) {
+      toast.error(err || "Could not disconnect");
+    } finally {
+      setDisconnectTarget(null);
+    }
   };
 
   return (
@@ -101,159 +80,316 @@ export default function CMSPage() {
       <PageHeader
         eyebrow="Publishing"
         title="CMS Connections"
-        subtitle="Connect your CMS accounts to publish articles directly from Newsroom MCP."
+        subtitle="Connect your WordPress sites so Newsroom MCP can publish drafts on your behalf."
         actions={
           <GradientButton size="md" onClick={() => setConnectOpen(true)}>
-            <Plus className="h-4 w-4" /> Add connection
+            <Plus className="h-4 w-4" /> Connect WordPress
           </GradientButton>
         }
       />
 
-      <motion.div
-        variants={staggerContainer(0.06)}
-        initial="hidden"
-        animate="visible"
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-      >
-        {connections.map((c) => (
-          <motion.div key={c.id} variants={staggerItem}>
-            <GlassCard
-              hover
-              glow={c.status === "connected" ? "teal" : null}
-              className={`p-5 h-full flex flex-col ${c.default ? "ring-2 ring-primary/30" : ""}`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <span className={`h-11 w-11 rounded-xl bg-gradient-to-br ${PLATFORM_COLORS[c.platform]} flex items-center justify-center shadow-lg`}>
-                    <Globe className="h-5 w-5 text-white" />
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-display text-lg leading-tight">{c.platform}</h3>
-                      {c.default && <Star className="h-3.5 w-3.5 text-amber-400 fill-amber-400" />}
-                    </div>
-                    <Badge variant="glass" className="text-[9px] mt-1">{c.phase}</Badge>
-                  </div>
-                </div>
-                {c.status === "connected" ? (
-                  <CheckCircle2 className="h-5 w-5 text-emerald-400" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-muted-foreground/40" />
-                )}
-              </div>
+      {isLoading && connections.length === 0 ? (
+        <ConnectionsSkeleton />
+      ) : connections.length === 0 ? (
+        <EmptyState onAdd={() => setConnectOpen(true)} />
+      ) : (
+        <motion.div
+          variants={staggerContainer(0.06)}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
+          {connections.map((c) => (
+            <motion.div key={c._id} variants={staggerItem}>
+              <ConnectionCard
+                connection={c}
+                isBusy={busyId === c._id}
+                onTest={() => onTest(c._id)}
+                onDelete={() => setDisconnectTarget(c)}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
+      )}
 
-              <div className="mt-4 space-y-2 text-xs flex-1">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status</span>
-                  <span className={c.status === "connected" ? "text-emerald-400" : "text-muted-foreground"}>
-                    {c.status}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Site URL</span>
-                  <span className="truncate ml-2 max-w-[160px]">{c.siteUrl}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Auth</span>
-                  <span>{c.authMethod}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Last sync</span>
-                  <span>{c.lastSync ? dateFormater(c.lastSync, "MMM d, HH:mm") : "—"}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-white/5">
-                {c.status === "connected" ? (
-                  <>
-                    <Button variant="glass" size="sm" className="flex-1" onClick={() => testConnection(c.id)}>
-                      <RefreshCw className="h-3.5 w-3.5" /> Test
-                    </Button>
-                    {!c.default && (
-                      <Button variant="ghost" size="sm" onClick={() => setDefault(c.id)}>
-                        <Star className="h-3.5 w-3.5" /> Default
-                      </Button>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => setDisconnectTarget(c)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </>
-                ) : (
-                  <GradientButton
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setConnectOpen(true)}
-                  >
-                    <Plug className="h-3.5 w-3.5" /> Connect
-                  </GradientButton>
-                )}
-              </div>
-            </GlassCard>
-          </motion.div>
-        ))}
-      </motion.div>
-
-      <ConnectDialog open={connectOpen} onOpenChange={setConnectOpen} onConnect={handleConnect} />
+      <ConnectWordpressDialog
+        open={connectOpen}
+        onOpenChange={setConnectOpen}
+        onSuccess={() => {
+          setConnectOpen(false);
+          dispatch(fetchCmsConnections());
+        }}
+      />
 
       <ConfirmDialog
         open={!!disconnectTarget}
         onOpenChange={(o) => !o && setDisconnectTarget(null)}
-        title={`Disconnect ${disconnectTarget?.platform}?`}
-        description="You won't be able to publish to this CMS until you reconnect."
+        title="Disconnect this site?"
+        description="Articles will no longer publish to this site until you reconnect."
         confirmLabel="Disconnect"
         destructive
-        onConfirm={handleDisconnect}
+        onConfirm={onDisconnect}
       />
     </div>
   );
 }
 
-function ConnectDialog({ open, onOpenChange, onConnect }) {
-  const [platform, setPlatform] = useState("WordPress");
-  const [url, setUrl] = useState("");
-  const [key, setKey] = useState("");
+/* ──────────────────────────────────────────────────────────
+ *  Connection card
+ * ────────────────────────────────────────────────────────── */
+function ConnectionCard({ connection, isBusy, onTest, onDelete }) {
+  const isConnected = !!connection.lastTestedAt;
+  return (
+    <GlassCard
+      hover
+      glow={isConnected ? "teal" : null}
+      className="p-5 h-full flex flex-col"
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="h-11 w-11 rounded-xl bg-linear-to-br from-blue-600 to-blue-400 flex items-center justify-center shadow-lg shrink-0">
+            <Globe className="h-5 w-5 text-white" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="font-display text-lg leading-tight capitalize">
+              {connection.provider}
+            </h3>
+            <p className="text-xs text-muted-foreground truncate">
+              {connection.label || connection.siteUrl}
+            </p>
+          </div>
+        </div>
+        {isConnected ? (
+          <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+        ) : (
+          <XCircle className="h-5 w-5 text-muted-foreground/40 shrink-0" />
+        )}
+      </div>
+
+      <div className="mt-4 space-y-2 text-xs flex-1">
+        <Row label="Site URL" value={connection.siteUrl} mono />
+        <Row label="User" value={connection.username} />
+        <Row
+          label="Last tested"
+          value={
+            connection.lastTestedAt
+              ? dateFormater(connection.lastTestedAt, "MMM d, HH:mm")
+              : "—"
+          }
+        />
+        {connection.isDefault && (
+          <Badge variant="outline" className="text-[9px]">
+            Default
+          </Badge>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-white/5">
+        <Button
+          variant="glass"
+          size="sm"
+          className="flex-1"
+          onClick={onTest}
+          disabled={isBusy}
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${isBusy ? "animate-spin" : ""}`} />
+          {isBusy ? "Testing…" : "Test"}
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-destructive hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+    </GlassCard>
+  );
+}
+
+function Row({ label, value, mono }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={`text-right truncate ${mono ? "font-mono text-[11px]" : ""}`}
+        title={value}
+      >
+        {value || "—"}
+      </span>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────
+ *  Empty state
+ * ────────────────────────────────────────────────────────── */
+function EmptyState({ onAdd }) {
+  return (
+    <GlassCard className="p-10 text-center">
+      <div className="mx-auto h-12 w-12 rounded-full glass border border-white/10 flex items-center justify-center mb-3">
+        <Globe className="h-5 w-5 text-muted-foreground" />
+      </div>
+      <h3 className="text-base font-semibold">No CMS connected yet</h3>
+      <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+        Connect a WordPress site to push generated articles as drafts.
+        We use HTTPS application passwords — credentials are encrypted at rest.
+      </p>
+      <GradientButton size="md" onClick={onAdd} className="mt-4">
+        <Plus className="h-4 w-4" /> Connect WordPress
+      </GradientButton>
+    </GlassCard>
+  );
+}
+
+function ConnectionsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {[0, 1, 2].map((i) => (
+        <GlassCard key={i} className="p-5 h-44 animate-pulse" />
+      ))}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────
+ *  Connect WordPress dialog
+ * ────────────────────────────────────────────────────────── */
+function ConnectWordpressDialog({ open, onOpenChange, onSuccess }) {
+  const dispatch = useDispatch();
+  const [siteUrl, setSiteUrl] = useState("");
+  const [username, setUsername] = useState("");
+  const [applicationPassword, setApplicationPassword] = useState("");
+  const [label, setLabel] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const reset = () => {
+    setSiteUrl("");
+    setUsername("");
+    setApplicationPassword("");
+    setLabel("");
+  };
+
+  const submit = async () => {
+    if (!siteUrl || !username || !applicationPassword) {
+      toast.error("All fields except label are required");
+      return;
+    }
+    if (!/^https:\/\//i.test(siteUrl)) {
+      toast.error("Site URL must use https://");
+      return;
+    }
+    setBusy(true);
+    try {
+      await dispatch(
+        addWordpressConnection({
+          siteUrl,
+          username,
+          applicationPassword,
+          label: label || undefined,
+        })
+      ).unwrap();
+      toast.success("WordPress site connected");
+      reset();
+      onSuccess?.();
+    } catch (err) {
+      toast.error(err || "Could not connect site");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { setUrl(""); setKey(""); } onOpenChange(o); }}>
-      <DialogContent className="glass border border-white/10">
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) reset();
+        onOpenChange(o);
+      }}
+    >
+      <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Connect CMS</DialogTitle>
-          <DialogDescription>Enter your site URL and authentication credentials.</DialogDescription>
+          <DialogTitle>Connect WordPress</DialogTitle>
+          <DialogDescription>
+            Use an{" "}
+            <a
+              href="https://wordpress.com/support/security/two-step-authentication/application-specific-passwords/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary hover:underline"
+            >
+              application password
+            </a>
+            . Plain user passwords will not work.
+          </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-4 pt-2">
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Platform</Label>
-            <Select value={platform} onValueChange={setPlatform}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="WordPress">WordPress</SelectItem>
-                <SelectItem value="Ghost">Ghost</SelectItem>
-                <SelectItem value="Notion">Notion</SelectItem>
-                <SelectItem value="Contentful">Contentful</SelectItem>
-                <SelectItem value="Sanity">Sanity</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Site URL
+            </Label>
+            <Input
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              className="mt-1.5"
+              placeholder="https://blog.example.com"
+            />
           </div>
-          <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Site URL</Label>
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} className="mt-1.5" placeholder="https://blog.example.com" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+                Username
+              </Label>
+              <Input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="mt-1.5"
+                placeholder="wp_admin"
+              />
+            </div>
+            <div>
+              <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+                Label (optional)
+              </Label>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                className="mt-1.5"
+                placeholder="My main blog"
+              />
+            </div>
           </div>
           <div>
             <Label className="text-xs uppercase tracking-widest text-muted-foreground">
-              {platform === "WordPress" ? "Application Password" : platform === "Ghost" ? "Admin API Key" : "API Token"}
+              Application Password
             </Label>
-            <Input value={key} onChange={(e) => setKey(e.target.value)} className="mt-1.5 font-mono" type="password" placeholder="Paste your key…" />
+            <Input
+              value={applicationPassword}
+              onChange={(e) => setApplicationPassword(e.target.value)}
+              className="mt-1.5 font-mono"
+              type="password"
+              placeholder="xxxx xxxx xxxx xxxx xxxx xxxx"
+            />
+            <p className="text-[11px] text-muted-foreground mt-1.5 flex items-start gap-1">
+              <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+              We encrypt this with AES-256-GCM before storing it. The plain
+              value is never returned by our API.
+            </p>
           </div>
         </div>
+
         <DialogFooter className="mt-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <GradientButton size="sm" onClick={() => onConnect(platform, url, key)} disabled={!url.trim() || !key.trim()}>
-            <Plug className="h-4 w-4" /> Connect
+          <Button
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            disabled={busy}
+          >
+            Cancel
+          </Button>
+          <GradientButton size="sm" onClick={submit} disabled={busy}>
+            <Plug className="h-4 w-4" /> {busy ? "Verifying…" : "Connect site"}
           </GradientButton>
         </DialogFooter>
       </DialogContent>

@@ -1,13 +1,18 @@
 import { API, handleRequest } from "@/lib/http";
 
-export const getCmsConnections = (query = "") =>
-  handleRequest(() => API.get(`/api/cms/connections${query}`));
+const BASE = "/api/v1/cms/connections";
 
-export const addCmsConnection = (data) =>
-  handleRequest(() => API.post(`/api/cms/connections`, data));
+export const listCmsConnectionsApi = () =>
+  handleRequest(() => API.get(BASE));
 
-export const testCmsConnection = (id) =>
-  handleRequest(() => API.post(`/api/cms/connections/${id}/test`));
+export const getCmsConnectionApi = (id) =>
+  handleRequest(() => API.get(`${BASE}/${id}`));
 
-export const deleteCmsConnection = (id) =>
-  handleRequest(() => API.delete(`/api/cms/connections/${id}`));
+export const createWordpressConnectionApi = (payload) =>
+  handleRequest(() => API.post(BASE, payload));
+
+export const testCmsConnectionApi = (id) =>
+  handleRequest(() => API.post(`${BASE}/${id}/test`));
+
+export const deleteCmsConnectionApi = (id) =>
+  handleRequest(() => API.delete(`${BASE}/${id}`));

@@ -4,6 +4,7 @@ import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import AppFooter from "@/components/layout/AppFooter";
 import BackgroundOrbs from "@/components/shared/BackgroundOrbs";
+import ArticleSocketProvider from "@/components/providers/ArticleSocketProvider";
 import { USER_NAV } from "@/lib/constants";
 import { pageTransition } from "@/lib/animations";
 
@@ -30,6 +31,7 @@ export default function UserLayout() {
 
   return (
     <div className="relative flex h-screen overflow-hidden">
+      <ArticleSocketProvider />
       <BackgroundOrbs gridBg={false} />
 
       <Sidebar nav={USER_NAV} variant="user" />

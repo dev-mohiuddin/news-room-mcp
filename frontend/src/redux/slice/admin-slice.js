@@ -7,6 +7,11 @@ import {
   deleteUserApi,
 } from "@/api/admin/users";
 import { listAuditLogsApi } from "@/api/admin/audit";
+import {
+  listAdminArticlesApi,
+  setArticleHiddenApi,
+  setArticleFlaggedApi,
+} from "@/api/admin/content";
 
 /* ──────────────────────────────────────────────────────────
  *  Thunks — Users
@@ -69,6 +74,36 @@ export const fetchAuditLogs = createAsyncThunk(
 );
 
 /* ──────────────────────────────────────────────────────────
+ *  Thunks — Content moderation
+ * ────────────────────────────────────────────────────────── */
+export const fetchAdminArticles = createAsyncThunk(
+  "admin/articles/list",
+  async (params, { rejectWithValue }) => {
+    const res = await listAdminArticlesApi(params);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to load articles");
+  }
+);
+
+export const toggleArticleHidden = createAsyncThunk(
+  "admin/articles/toggleHidden",
+  async ({ id, hidden }, { rejectWithValue }) => {
+    const res = await setArticleHiddenApi(id, hidden);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to update visibility");
+  }
+);
+
+export const toggleArticleFlagged = createAsyncThunk(
+  "admin/articles/toggleFlagged",
+  async ({ id, flagged, reason }, { rejectWithValue }) => {
+    const res = await setArticleFlaggedApi(id, flagged, reason);
+    if (res?.success) return res;
+    return rejectWithValue(res?.message || "Failed to update flag");
+  }
+);
+
+/* ──────────────────────────────────────────────────────────
  *  Slice
  * ────────────────────────────────────────────────────────── */
 const initialState = {
@@ -78,6 +113,9 @@ const initialState = {
 
   logs: [],
   logsPagination: null,
+
+  articles: [],
+  articlesPagination: null,
 
   isLoading: false,
   isMutating: false,
@@ -150,6 +188,36 @@ const adminSlice = createSlice({
       .addCase(fetchAuditLogs.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
+      })
+
+      /* Content moderation */
+      .addCase(fetchAdminArticles.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(fetchAdminArticles.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.articles = action.payload.data || [];
+        state.articlesPagination = action.payload.pagination || null;
+      })
+      .addCase(fetchAdminArticles.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(toggleArticleHidden.fulfilled, (state, action) => {
+        const updated = action.payload?.data;
+        if (!updated) return;
+        state.articles = state.articles.map((a) =>
+          a._id === updated._id ? updated : a
+        );
+      })
+
+      .addCase(toggleArticleFlagged.fulfilled, (state, action) => {
+        const updated = action.payload?.data;
+        if (!updated) return;
+        state.articles = state.articles.map((a) =>
+          a._id === updated._id ? updated : a
+        );
       });
   },
 });

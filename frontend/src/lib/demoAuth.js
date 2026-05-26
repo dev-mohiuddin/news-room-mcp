@@ -1,8 +1,10 @@
-// Demo login profiles — these now hit the REAL backend /auth/login endpoint
-// using the seeded credentials from initSuperAdmin.js.
+// Demo login profiles — these hit the REAL backend /api/v1/auth/login
+// using the credentials seeded by initSuperAdmin.js.
 //
-// In dev or after backend seeds these accounts, demo cards work end-to-end:
-//   click → POST /api/v1/auth/login → set cookies → redirect.
+// The "owner" demo is the workspace_owner role which holds EVERY
+// tenant permission (article create/update/publish, team manage,
+// CMS manage, brand voice, billing, settings — everything).
+// Pair it with the super_admin demo to showcase both panels.
 
 import { ROLES } from "./constants";
 
@@ -10,7 +12,7 @@ export const DEMO_ACCOUNTS = {
   admin: {
     role: ROLES.SUPER_ADMIN,
     label: "Super Admin",
-    description: "Full platform control · plans, users, billing, content",
+    description: "Full platform control · plans, users, billing, audit logs",
     email: "admin@newsroommcp.com",
     password: "Admin@12345",
     badge: "ADMIN",
@@ -19,16 +21,16 @@ export const DEMO_ACCOUNTS = {
     iconKey: "shield",
     redirectTo: "/admin/dashboard",
   },
-  user: {
+  owner: {
     role: ROLES.WORKSPACE_OWNER,
-    label: "Publisher",
-    description: "Workspace owner · article generation, CMS, brand voice",
+    label: "Workspace Owner",
+    description: "All tenant permissions · articles, team, billing, CMS, brand voice",
     email: "user@newsroommcp.com",
     password: "User@12345",
-    badge: "USER",
+    badge: "OWNER",
     glow: "blue",
     accent: "from-blue-500 via-cyan-500 to-teal-500",
-    iconKey: "sparkles",
+    iconKey: "crown",
     redirectTo: "/dashboard",
   },
 };
