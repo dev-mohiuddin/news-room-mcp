@@ -3,6 +3,7 @@ import { User } from "#models/userModel.js";
 import { Role } from "#models/roleModel.js";
 import { Workspace } from "#models/workspaceModel.js";
 import { ROLE_NAMES, ROLE_SCOPES } from "#constants/roles.js";
+import { ensureSubscription } from "#repositories/subscriptionRepository.js";
 
 /**
  * Seeds two demo accounts on first DB connection:
@@ -64,11 +65,12 @@ export const initSuperAdmin = async () => {
         name: `${seed.name}'s workspace`,
         slug: `${slugify(seed.name)}-${user._id.toString().slice(-6)}`,
         ownerId: user._id,
-        plan: "pro",
       });
       user.workspaceId = ws._id;
       await user.save();
-      logger.info(`Workspace created for ${seed.email}`);
+      // Seed a `pro` subscription so demo data shows realistic limits.
+      await ensureSubscription(ws._id, { plan: "pro", anchor: new Date() });
+      logger.info(`Workspace + subscription created for ${seed.email}`);
     }
 
     logger.info(`Seed account created: ${seed.email} (${seed.roleName})`);

@@ -68,6 +68,25 @@ const auditLogSchema = new mongoose.Schema(
 
 auditLogSchema.index({ createdAt: -1 });
 auditLogSchema.index({ category: 1, createdAt: -1 });
+// Cross-tenant audit lookups by workspace + time
+auditLogSchema.index({ workspaceId: 1, createdAt: -1 });
+// Filter by category + action + time (admin audit page common path)
+auditLogSchema.index({ category: 1, action: 1, createdAt: -1 });
+// Per-actor activity timeline (e.g. "show me what user X did")
+auditLogSchema.index({ actorId: 1, createdAt: -1 });
+// Entity history: "show me everything that happened to article Y"
+auditLogSchema.index({ entityType: 1, entityId: 1, createdAt: -1 });
+// Status-only queries (failed actions investigation)
+auditLogSchema.index({ status: 1, createdAt: -1 });
+// TTL — auto-purge audit entries after 180 days unless overridden by env.
+// Set AUDIT_LOG_RETENTION_DAYS=0 to disable expiry.
+const auditRetentionDays = Number(process.env.AUDIT_LOG_RETENTION_DAYS ?? 180);
+if (auditRetentionDays > 0) {
+  auditLogSchema.index(
+    { createdAt: 1 },
+    { expireAfterSeconds: auditRetentionDays * 24 * 60 * 60, name: "audit_ttl" }
+  );
+}
 
 export const AuditLog = mongoose.model("AuditLog", auditLogSchema);
 export default AuditLog;

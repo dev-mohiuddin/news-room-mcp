@@ -59,5 +59,16 @@ invitationSchema.statics.hashToken = function (raw) {
   return crypto.createHash("sha256").update(raw).digest("hex");
 };
 
+/* ── Indexes for query paths ── */
+// Common filter: pending invites for a workspace (team page)
+invitationSchema.index({ workspaceId: 1, status: 1, createdAt: -1 });
+// Per-email lookup for re-send/conflict detection
+invitationSchema.index({ workspaceId: 1, email: 1, status: 1 });
+// TTL: auto-purge expired invitation rows 14 days after they expire
+invitationSchema.index(
+  { expiresAt: 1 },
+  { expireAfterSeconds: 14 * 24 * 60 * 60, name: "invite_ttl" }
+);
+
 export const Invitation = mongoose.model("Invitation", invitationSchema);
 export default Invitation;

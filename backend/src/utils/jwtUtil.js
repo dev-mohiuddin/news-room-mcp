@@ -1,6 +1,15 @@
 import jwt from "jsonwebtoken";
+import crypto from "node:crypto";
 
 const ISSUER = "newsroom-mcp";
+
+/**
+ * Generate a fresh JTI (JWT ID) — used to track refresh-token chains
+ * for rotation + reuse-detection (Requirement 16).
+ */
+export const generateJti = () =>
+  (crypto.randomUUID && crypto.randomUUID()) ||
+  crypto.randomBytes(16).toString("hex");
 
 const getSecret = (type) => {
   const secret =
@@ -32,12 +41,15 @@ export const signAccessToken = (payload, options = {}) => {
 };
 
 export const signRefreshToken = (payload, options = {}) => {
-  return jwt.sign(payload, getSecret("refresh"), {
+  const jti = options.jwtid || generateJti();
+  const token = jwt.sign(payload, getSecret("refresh"), {
     algorithm: "HS256",
     expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
     issuer: ISSUER,
+    jwtid: jti,
     ...options,
   });
+  return { token, jti };
 };
 
 export const verifyAccessToken = (token) =>

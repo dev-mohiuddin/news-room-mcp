@@ -1,6 +1,10 @@
 import { logger } from "#utils/logger.js";
 import { initPlatformRoles } from "#config/initDataSetup/initRoles.js";
 import { initSuperAdmin } from "#config/initDataSetup/initSuperAdmin.js";
+import {
+  migrateWorkspacePlan,
+  assertWorkspaceSchemaClean,
+} from "#config/initDataSetup/migrateWorkspacePlan.js";
 
 /**
  * Idempotent seeders run on every startup.
@@ -8,7 +12,9 @@ import { initSuperAdmin } from "#config/initDataSetup/initSuperAdmin.js";
  */
 export const initData = async () => {
   try {
+    assertWorkspaceSchemaClean();
     await initPlatformRoles();
+    await migrateWorkspacePlan();
     await initSuperAdmin();
     logger.info("Init data seed complete");
   } catch (err) {

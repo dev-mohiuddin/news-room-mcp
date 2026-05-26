@@ -39,8 +39,14 @@ const clearAuthCookies = (res) => {
  *  Endpoints
  * ────────────────────────────────────────────────────────── */
 
+const extractRefreshToken = (req) =>
+  req.cookies?.refresh_token ||
+  req.body?.refreshToken ||
+  req.headers["x-refresh-token"] ||
+  null;
+
 export const register = catchAsync(async (req, res) => {
-  const result = await authService.register(req.body);
+  const result = await authService.register(req.body, { req });
 
   // If dev mode auto-verified the user, set cookies + return tokens
   if (result.accessToken) {
@@ -64,7 +70,7 @@ export const register = catchAsync(async (req, res) => {
 });
 
 export const verifyOtp = catchAsync(async (req, res) => {
-  const result = await authService.verifyOtp(req.body);
+  const result = await authService.verifyOtp(req.body, { req });
   setAuthCookies(res, result);
   res.success({
     data: { user: result.user, accessToken: result.accessToken },
@@ -81,7 +87,7 @@ export const resendOtp = catchAsync(async (req, res) => {
 });
 
 export const login = catchAsync(async (req, res) => {
-  const result = await authService.login(req.body);
+  const result = await authService.login(req.body, { req });
   setAuthCookies(res, result);
   res.success({
     data: { user: result.user, accessToken: result.accessToken },
@@ -90,7 +96,7 @@ export const login = catchAsync(async (req, res) => {
 });
 
 export const googleSignIn = catchAsync(async (req, res) => {
-  const result = await authService.googleSignIn(req.body);
+  const result = await authService.googleSignIn(req.body, { req });
   setAuthCookies(res, result);
   res.success({
     data: { user: result.user, accessToken: result.accessToken },
@@ -98,7 +104,9 @@ export const googleSignIn = catchAsync(async (req, res) => {
   });
 });
 
-export const logout = catchAsync(async (_req, res) => {
+export const logout = catchAsync(async (req, res) => {
+  const rawToken = extractRefreshToken(req);
+  await authService.logout({ rawToken });
   clearAuthCookies(res);
   res.success({ data: null, message: "Logged out successfully" });
 });
@@ -109,9 +117,12 @@ export const me = catchAsync(async (req, res) => {
 });
 
 export const refreshToken = catchAsync(async (req, res) => {
-  // The route uses a dedicated middleware that extracts & verifies refresh token
-  // and attaches req.user.id to this point.
-  const result = await authService.refreshAccessToken(req.user.id);
+  const rawToken = extractRefreshToken(req);
+  const result = await authService.refreshAccessToken({
+    rawToken,
+    userId: req.user?.id,
+    req,
+  });
   setAuthCookies(res, result);
   res.success({
     data: { user: result.user, accessToken: result.accessToken },

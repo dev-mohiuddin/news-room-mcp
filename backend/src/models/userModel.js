@@ -77,6 +77,17 @@ const userSchema = new mongoose.Schema(
   { timestamps: true, versionKey: false }
 );
 
+/* ── Indexes for hot query paths ── */
+// Admin user list filters
+userSchema.index({ workspaceId: 1, roleId: 1 });
+userSchema.index({ workspaceId: 1, isActive: 1 });
+userSchema.index({ createdAt: -1 });
+// Password reset token lookups (sparse — most users don't have one set)
+userSchema.index(
+  { passwordResetToken: 1 },
+  { sparse: true, partialFilterExpression: { passwordResetToken: { $type: "string" } } }
+);
+
 /* ── Pre-save: hash password if modified ── */
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password") || !this.password) return next();

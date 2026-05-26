@@ -20,6 +20,7 @@ export const verifyRefreshTokenMiddleware = (req, res, next) => {
 
     const decoded = verifyRefreshToken(token);
     req.user = { id: decoded.id || decoded.sub };
+    req.refreshToken = token; // raw token surfaced for service rotation
     next();
   } catch (err) {
     return res.error({

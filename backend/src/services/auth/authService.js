@@ -17,6 +17,7 @@ import {
   createWorkspace,
   findWorkspaceByOwnerId,
 } from "#repositories/workspaceRepository.js";
+import { ensureSubscription } from "#repositories/subscriptionRepository.js";
 import {
   createOtp,
   findActiveOtp,
@@ -26,6 +27,14 @@ import {
   invalidateAllOtps,
   OTP_PURPOSES,
 } from "#repositories/otpRepository.js";
+
+import {
+  recordIssued as recordRefreshTokenIssued,
+  consume as consumeRefreshToken,
+  findByRawToken as findRefreshTokenByRaw,
+  revokeAllForUser as revokeAllRefreshTokensForUser,
+  revokeByRawToken as revokeRefreshTokenByRaw,
+} from "#repositories/refreshTokenRepository.js";
 
 import { signAccessToken, signRefreshToken } from "#utils/jwtUtil.js";
 import { generateOtp, getOtpExpiry } from "#utils/otpUtil.js";
@@ -63,6 +72,14 @@ const buildUserPayload = (user) => {
 };
 
 /* ──────────────────────────────────────────────────────────
+ *  Refresh token TTL — must mirror jwtUtil's JWT_REFRESH_EXPIRES_IN
+ * ────────────────────────────────────────────────────────── */
+const REFRESH_TTL_MS = (() => {
+  const days = Number(process.env.REFRESH_TOKEN_COOKIE_MAX_AGE_DAYS || 30);
+  return days * 24 * 60 * 60 * 1000;
+})();
+
+/* ──────────────────────────────────────────────────────────
  *  Token generation helper
  * ────────────────────────────────────────────────────────── */
 const generateTokens = (user) => {
@@ -73,10 +90,38 @@ const generateTokens = (user) => {
     role: role?.name,
     permissions: role?.permissions || [],
   };
-  return {
-    accessToken: signAccessToken(payload),
-    refreshToken: signRefreshToken({ id: payload.id }),
-  };
+  const accessToken = signAccessToken(payload);
+  const { token: refreshToken, jti } = signRefreshToken({ id: payload.id });
+  return { accessToken, refreshToken, refreshJti: jti };
+};
+
+/**
+ * Issue a fresh token pair AND persist the refresh token record so that
+ * rotation + reuse detection (Requirement 16) can track its lifecycle.
+ *
+ * Pass `parentJti` on rotation to link the new record to the consumed one.
+ */
+const issueTokensAndPersist = async (user, { req = null, parentJti = null } = {}) => {
+  const { accessToken, refreshToken, refreshJti } = generateTokens(user);
+  try {
+    await recordRefreshTokenIssued({
+      rawToken: refreshToken,
+      jti: refreshJti,
+      userId: user._id,
+      parentJti,
+      userAgent: req?.headers?.["user-agent"] || null,
+      ip: req?.ip || null,
+      expiresAt: new Date(Date.now() + REFRESH_TTL_MS),
+    });
+  } catch (err) {
+    // Persistence failure must not break the user-facing login.
+    // The refresh-rotation enforcement falls back gracefully — without a
+    // record, refreshAccessToken below logs out the user with REFRESH_REUSE.
+    logger.warn("[auth] could not persist refresh token", {
+      message: err.message,
+    });
+  }
+  return { accessToken, refreshToken };
 };
 
 /* ──────────────────────────────────────────────────────────
@@ -86,7 +131,7 @@ const generateTokens = (user) => {
  *   - PROD: create unverified user → send OTP → require verification
  *   - DEV : create verified user → return tokens immediately (skip OTP)
  * ────────────────────────────────────────────────────────── */
-export const register = async ({ name, email, password }) => {
+export const register = async ({ name, email, password }, ctx = {}) => {
   const existing = await findUserByEmail(email, { populateRole: false });
   if (existing) {
     throwError("Email already exists", 409);
@@ -112,13 +157,14 @@ export const register = async ({ name, email, password }) => {
     ownerId: user._id,
   });
   await updateUserById(user._id, { workspaceId: workspace._id });
+  await ensureSubscription(workspace._id, { anchor: new Date() });
 
   // Re-fetch with populated role (createUser returns raw doc)
   const populated = await findUserById(user._id);
 
   if (skipOtp) {
     // DEV path — instant login
-    const tokens = generateTokens(populated);
+    const tokens = await issueTokensAndPersist(populated, { req: ctx.req });
     await updateLastLogin(populated._id);
     logger.info("User registered (dev — auto-verified)", { email });
     return {
@@ -148,7 +194,7 @@ export const register = async ({ name, email, password }) => {
 /* ──────────────────────────────────────────────────────────
  *  Verify OTP — completes registration
  * ────────────────────────────────────────────────────────── */
-export const verifyOtp = async ({ email, otp }) => {
+export const verifyOtp = async ({ email, otp }, ctx = {}) => {
   const user = await findUserByEmail(email);
   if (!user) throwError("User not found", 404);
   if (user.isVerified) throwError("Account already verified", 400);
@@ -172,7 +218,7 @@ export const verifyOtp = async ({ email, otp }) => {
   await updateLastLogin(user._id);
 
   const fresh = await findUserById(user._id);
-  const tokens = generateTokens(fresh);
+  const tokens = await issueTokensAndPersist(fresh, { req: ctx.req });
 
   return {
     user: buildUserPayload(fresh),
@@ -210,7 +256,7 @@ export const resendOtp = async ({ email }) => {
 /* ──────────────────────────────────────────────────────────
  *  Login (email + password)
  * ────────────────────────────────────────────────────────── */
-export const login = async ({ email, password }) => {
+export const login = async ({ email, password }, ctx = {}) => {
   const user = await findUserByEmail(email, { includePassword: true });
   if (!user) throwError("Invalid email or password", 401);
 
@@ -231,7 +277,7 @@ export const login = async ({ email, password }) => {
     throwError("Please verify your email before logging in.", 403);
   }
 
-  const tokens = generateTokens(user);
+  const tokens = await issueTokensAndPersist(user, { req: ctx.req });
   await updateLastLogin(user._id);
 
   await logAudit({
@@ -241,6 +287,7 @@ export const login = async ({ email, password }) => {
     entityType: "user",
     entityId: user._id,
     workspaceId: user.workspaceId,
+    req: ctx.req,
   });
 
   return {
@@ -266,7 +313,7 @@ const getGoogleClient = () => {
   return googleClient;
 };
 
-export const googleSignIn = async ({ idToken }) => {
+export const googleSignIn = async ({ idToken }, ctx = {}) => {
   const client = getGoogleClient();
 
   let payload;
@@ -320,12 +367,13 @@ export const googleSignIn = async ({ idToken }) => {
       ownerId: created._id,
     });
     await updateUserById(created._id, { workspaceId: workspace._id });
+    await ensureSubscription(workspace._id, { anchor: new Date() });
     user = await findUserById(created._id);
   }
 
   if (!user.isActive) throwError("Account is suspended. Contact support.", 403);
 
-  const tokens = generateTokens(user);
+  const tokens = await issueTokensAndPersist(user, { req: ctx.req });
   await updateLastLogin(user._id);
 
   return {
@@ -344,18 +392,75 @@ export const getMe = async (userId) => {
 };
 
 /* ──────────────────────────────────────────────────────────
- *  Refresh access token
+ *  Refresh access token  — Requirement 16
+ *
+ *  Performs single-use rotation with reuse detection:
+ *   1. Atomically consume the current refresh-token record
+ *      (CAS: revokedAt=null AND expiresAt>now → set revokedAt=now)
+ *   2. If the consume returned no record:
+ *        a) maybe the token never existed (logged-out / older session)
+ *        b) maybe it was already consumed (REUSE) — in which case the
+ *           record exists but is revoked; revoke ALL active tokens for
+ *           the user and force re-login (`REFRESH_REUSE_DETECTED`)
+ *   3. Otherwise issue a new pair, link via parentJti
  * ────────────────────────────────────────────────────────── */
-export const refreshAccessToken = async (userId) => {
-  const user = await findUserById(userId);
+export const refreshAccessToken = async ({ rawToken, userId, req = null }) => {
+  if (!rawToken) throwError("Refresh token missing", 401);
+
+  const consumed = await consumeRefreshToken(rawToken);
+
+  if (!consumed) {
+    // Either the token was never persisted or it was already consumed.
+    const existing = await findRefreshTokenByRaw(rawToken);
+    if (existing && existing.revokedAt) {
+      // REUSE — nuke the entire refresh-token chain for this user.
+      await revokeAllRefreshTokensForUser(existing.userId);
+      await logAudit({
+        actorId: existing.userId,
+        category: "auth",
+        action: "auth.refresh_reuse_detected",
+        entityType: "user",
+        entityId: existing.userId,
+        status: "failure",
+        metadata: { jti: existing.jti, parentJti: existing.parentJti },
+        req,
+      });
+      throwError(
+        "Session conflict detected. Please log in again.",
+        401
+      );
+    }
+    throwError("Invalid or expired refresh token", 401);
+  }
+
+  // Token was valid and is now revoked. Issue rotation pair.
+  const user = await findUserById(consumed.userId || userId);
   if (!user) throwError("User not found", 404);
   if (!user.isActive) throwError("Account is suspended", 403);
 
-  const tokens = generateTokens(user);
+  const tokens = await issueTokensAndPersist(user, {
+    req,
+    parentJti: consumed.jti,
+  });
+
   return {
     user: buildUserPayload(user),
     ...tokens,
   };
+};
+
+/* ──────────────────────────────────────────────────────────
+ *  Logout — revoke the current refresh token (Req 16)
+ * ────────────────────────────────────────────────────────── */
+export const logout = async ({ rawToken } = {}) => {
+  if (rawToken) {
+    try {
+      await revokeRefreshTokenByRaw(rawToken);
+    } catch (err) {
+      logger.warn("[auth] logout revoke failed", { message: err.message });
+    }
+  }
+  return { ok: true };
 };
 
 /* ──────────────────────────────────────────────────────────
