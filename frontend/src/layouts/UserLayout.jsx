@@ -5,6 +5,8 @@ import Topbar from "@/components/layout/Topbar";
 import AppFooter from "@/components/layout/AppFooter";
 import BackgroundOrbs from "@/components/shared/BackgroundOrbs";
 import ArticleSocketProvider from "@/components/providers/ArticleSocketProvider";
+import NotificationSocketProvider from "@/components/providers/NotificationSocketProvider";
+import MaintenanceBanner from "@/components/providers/MaintenanceBanner";
 import { USER_NAV } from "@/lib/constants";
 import { pageTransition } from "@/lib/animations";
 
@@ -32,12 +34,14 @@ export default function UserLayout() {
   return (
     <div className="relative flex h-screen overflow-hidden">
       <ArticleSocketProvider />
+      <NotificationSocketProvider />
       <BackgroundOrbs gridBg={false} />
 
       <Sidebar nav={USER_NAV} variant="user" />
 
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar title={title} variant="user" />
+        <MaintenanceBanner />
         <main className="flex-1 overflow-y-auto scroll-smooth">
           <div className="p-4 md:p-6 lg:p-8 max-w-[1400px] mx-auto w-full">
             <motion.div

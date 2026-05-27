@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
-  LifeBuoy,
   Plus,
   Send,
   Clock,
@@ -41,45 +41,99 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { staggerContainer, staggerItem, fadeUp } from "@/lib/animations";
+import { fadeUp } from "@/lib/animations";
 import { dateFormater } from "@/lib/utils";
-import { MY_TICKETS, USER_FAQS } from "@/lib/mockData";
-
-const STATUS_STYLES = {
-  open: "bg-blue-500/15 text-blue-400 border-blue-500/30",
-  pending: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  closed: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-};
-const PRIORITY_STYLES = {
-  high: "bg-red-500/15 text-red-400 border-red-500/30",
-  medium: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  low: "bg-slate-500/15 text-slate-300 border-slate-500/30",
-};
+import { USER_FAQS } from "@/lib/mockData";
+import {
+  fetchMyTickets,
+  fetchMyTicketStats,
+  fetchMyTicket,
+  createTicket,
+  replyToMyTicket,
+  tenantChangeStatus,
+  clearCurrentTicket,
+} from "@/redux/slice/support-slice";
+import TicketThread, {
+  STATUS_STYLES,
+  PRIORITY_STYLES,
+} from "@/components/support/TicketThread";
 
 export default function UserSupportPage() {
-  const [tickets, setTickets] = useState(MY_TICKETS);
+  const dispatch = useDispatch();
+  const tickets = useSelector((s) => s.support.myTickets);
+  const stats = useSelector((s) => s.support.myStats);
+  const current = useSelector((s) => s.support.current);
+  const isLoading = useSelector((s) => s.support.isLoading);
+  const isMutating = useSelector((s) => s.support.isMutating);
+
   const [createOpen, setCreateOpen] = useState(false);
+  const [activeId, setActiveId] = useState(null);
 
-  const stats = {
-    open: tickets.filter((t) => t.status === "open").length,
-    pending: tickets.filter((t) => t.status === "pending").length,
-    closed: tickets.filter((t) => t.status === "closed").length,
+  useEffect(() => {
+    dispatch(fetchMyTickets({ perPage: 20 }));
+    dispatch(fetchMyTicketStats());
+  }, [dispatch]);
+
+  useEffect(() => {
+    if (activeId) dispatch(fetchMyTicket(activeId));
+    else dispatch(clearCurrentTicket());
+  }, [activeId, dispatch]);
+
+  const handleCreate = async ({ subject, priority, body }) => {
+    const res = await dispatch(createTicket({ subject, priority, body }));
+    if (createTicket.fulfilled.match(res)) {
+      toast.success("Ticket submitted — we'll respond within 24 hours.");
+      setCreateOpen(false);
+      dispatch(fetchMyTicketStats());
+      dispatch(fetchMyTickets({ perPage: 20 }));
+      const newId = res.payload?.data?._id;
+      if (newId) setActiveId(newId);
+    } else {
+      toast.error(res.payload || "Could not submit ticket");
+    }
   };
 
-  const handleCreate = (subject, priority, body) => {
-    const item = {
-      id: `mt${tickets.length + 1}`,
-      subject,
-      priority,
-      status: "open",
-      updatedAt: new Date().toISOString(),
-      lastReply: null,
-      replies: 0,
-    };
-    setTickets((prev) => [item, ...prev]);
-    setCreateOpen(false);
-    toast.success("Ticket submitted — we'll respond within 24 hours.");
+  const handleReply = async (body) => {
+    if (!activeId) return;
+    const res = await dispatch(replyToMyTicket({ id: activeId, body }));
+    if (!replyToMyTicket.fulfilled.match(res)) {
+      toast.error(res.payload || "Could not reply");
+    } else {
+      dispatch(fetchMyTicketStats());
+    }
   };
+
+  const handleStatus = async (status) => {
+    if (!activeId) return;
+    const res = await dispatch(tenantChangeStatus({ id: activeId, status }));
+    if (tenantChangeStatus.fulfilled.match(res)) {
+      toast.success(`Marked as ${status}`);
+      dispatch(fetchMyTicketStats());
+    } else {
+      toast.error(res.payload || "Could not update status");
+    }
+  };
+
+  // ── If a ticket is active, render the thread view in place
+  if (activeId) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow="Help"
+          title="Ticket"
+          subtitle="Conversation with our support team."
+        />
+        <TicketThread
+          ticket={current}
+          variant="user"
+          onBack={() => setActiveId(null)}
+          onReply={handleReply}
+          onChangeStatus={handleStatus}
+          isMutating={isMutating}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -96,68 +150,97 @@ export default function UserSupportPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <KPICard icon={AlertCircle} label="Open" value={stats.open} glow="violet" />
+        <KPICard
+          icon={AlertCircle}
+          label="Open"
+          value={stats.open}
+          glow="violet"
+        />
         <KPICard icon={Clock} label="Pending reply" value={stats.pending} />
-        <KPICard icon={CheckCircle2} label="Resolved" value={stats.closed} glow="teal" />
+        <KPICard
+          icon={CheckCircle2}
+          label="Resolved"
+          value={stats.resolved + stats.closed}
+          glow="teal"
+        />
       </div>
 
       {/* My tickets */}
       <section>
         <h2 className="font-display text-xl mb-3">My tickets</h2>
-        <DataTable
-          data={tickets}
-          columns={[
-            {
-              key: "subject",
-              header: "Subject",
-              render: (t) => <span className="font-medium">{t.subject}</span>,
-            },
-            {
-              key: "priority",
-              header: "Priority",
-              render: (t) => (
-                <span className={`text-xs px-2 py-0.5 rounded-full border capitalize ${PRIORITY_STYLES[t.priority]}`}>
-                  {t.priority}
-                </span>
-              ),
-            },
-            {
-              key: "status",
-              header: "Status",
-              render: (t) => (
-                <span className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[t.status]}`}>
-                  {t.status}
-                </span>
-              ),
-            },
-            {
-              key: "replies",
-              header: "Replies",
-              render: (t) => (
-                <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                  <MessageSquare className="h-3 w-3" /> {t.replies}
-                </span>
-              ),
-            },
-            {
-              key: "updatedAt",
-              header: "Updated",
-              render: (t) => (
-                <span className="text-xs text-muted-foreground">
-                  {dateFormater(t.updatedAt, "MMM d, HH:mm")}
-                </span>
-              ),
-            },
-          ]}
-          emptyTitle="No tickets yet"
-          emptyDescription="You haven't submitted any support tickets."
-        />
+        {isLoading && tickets.length === 0 ? (
+          <GlassCard className="p-12 text-center text-sm text-muted-foreground">
+            Loading…
+          </GlassCard>
+        ) : (
+          <DataTable
+            data={tickets}
+            onRowClick={(t) => setActiveId(t._id)}
+            columns={[
+              {
+                key: "subject",
+                header: "Subject",
+                render: (t) => (
+                  <span className="font-medium truncate">{t.subject}</span>
+                ),
+              },
+              {
+                key: "priority",
+                header: "Priority",
+                render: (t) => (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full border capitalize ${PRIORITY_STYLES[t.priority]}`}
+                  >
+                    {t.priority}
+                  </span>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (t) => (
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full border capitalize ${STATUS_STYLES[t.status]}`}
+                  >
+                    {t.status}
+                  </span>
+                ),
+              },
+              {
+                key: "repliesCount",
+                header: "Replies",
+                render: (t) => (
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                    <MessageSquare className="h-3 w-3" />
+                    {t.repliesCount || 0}
+                  </span>
+                ),
+              },
+              {
+                key: "lastReplyAt",
+                header: "Updated",
+                render: (t) => (
+                  <span className="text-xs text-muted-foreground">
+                    {dateFormater(
+                      t.lastReplyAt || t.updatedAt,
+                      "MMM d, HH:mm"
+                    )}
+                  </span>
+                ),
+              },
+            ]}
+            emptyTitle="No tickets yet"
+            emptyDescription="You haven't submitted any support tickets."
+          />
+        )}
       </section>
 
       {/* FAQ */}
       <section>
         <motion.div variants={fadeUp} initial="hidden" animate="visible">
-          <h2 className="font-display text-xl mb-1">Frequently asked questions</h2>
+          <h2 className="font-display text-xl mb-1">
+            Frequently asked questions
+          </h2>
           <p className="text-xs text-muted-foreground mb-4">
             Quick answers to common questions.
           </p>
@@ -175,17 +258,17 @@ export default function UserSupportPage() {
         </GlassCard>
       </section>
 
-      {/* Create ticket dialog */}
       <CreateTicketDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
         onCreate={handleCreate}
+        isMutating={isMutating}
       />
     </div>
   );
 }
 
-function CreateTicketDialog({ open, onOpenChange, onCreate }) {
+function CreateTicketDialog({ open, onOpenChange, onCreate, isMutating }) {
   const [subject, setSubject] = useState("");
   const [priority, setPriority] = useState("medium");
   const [body, setBody] = useState("");
@@ -194,6 +277,15 @@ function CreateTicketDialog({ open, onOpenChange, onCreate }) {
     setSubject("");
     setPriority("medium");
     setBody("");
+  };
+
+  const submit = () => {
+    if (!subject.trim() || !body.trim()) {
+      toast.error("Subject and description are required");
+      return;
+    }
+    onCreate({ subject: subject.trim(), priority, body: body.trim() });
+    reset();
   };
 
   return (
@@ -214,13 +306,25 @@ function CreateTicketDialog({ open, onOpenChange, onCreate }) {
 
         <div className="space-y-4 pt-2">
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Subject</Label>
-            <Input value={subject} onChange={(e) => setSubject(e.target.value)} className="mt-1.5" placeholder="Brief summary of the issue" />
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Subject
+            </Label>
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="mt-1.5"
+              placeholder="Brief summary of the issue"
+              maxLength={200}
+            />
           </div>
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Priority</Label>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Priority
+            </Label>
             <Select value={priority} onValueChange={setPriority}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="low">Low</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
@@ -229,17 +333,31 @@ function CreateTicketDialog({ open, onOpenChange, onCreate }) {
             </Select>
           </div>
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Description</Label>
-            <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={5} className="mt-1.5" placeholder="Describe what happened, steps to reproduce, and what you expected…" />
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Description
+            </Label>
+            <Textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={5}
+              className="mt-1.5"
+              placeholder="Describe what happened, steps to reproduce, and what you expected…"
+              maxLength={5000}
+            />
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {body.length} / 5000
+            </p>
           </div>
         </div>
 
         <DialogFooter className="mt-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <GradientButton
             size="sm"
-            onClick={() => onCreate(subject || "Untitled", priority, body)}
-            disabled={!subject.trim()}
+            onClick={submit}
+            disabled={isMutating || !subject.trim() || !body.trim()}
           >
             <Send className="h-4 w-4" /> Submit ticket
           </GradientButton>

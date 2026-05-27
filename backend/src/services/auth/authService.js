@@ -89,6 +89,11 @@ const generateTokens = (user) => {
     email: user.email,
     role: role?.name,
     permissions: role?.permissions || [],
+    // Required by the Socket.io handshake (server.js → io.use) so the
+    // socket auto-joins `workspace:{id}` on connect. HTTP middleware
+    // never reads this — `protect` always re-loads from DB — so token
+    // staleness isn't a concern here.
+    workspaceId: user.workspaceId?.toString?.() || null,
   };
   const accessToken = signAccessToken(payload);
   const { token: refreshToken, jti } = signRefreshToken({ id: payload.id });

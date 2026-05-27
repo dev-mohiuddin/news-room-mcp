@@ -12,6 +12,7 @@ import {
 } from "#controllers/team/teamController.js";
 
 import { protect } from "#middlewares/authMiddleware.js";
+import { tenantScope } from "#middlewares/tenantScopeMiddleware.js";
 import { requirePermission } from "#middlewares/permissionMiddleware.js";
 import { validate } from "#middlewares/validateMiddleware.js";
 
@@ -28,7 +29,11 @@ import { PERMISSIONS } from "#constants/roles.js";
 
 export const teamRouter = express.Router();
 
-/* ── Public — invitation acceptance ── */
+/* ──────────────────────────────────────────────────────────
+ *  Public — invitation acceptance flow
+ *  These routes MUST stay outside `protect` + `tenantScope`
+ *  because the user accepting may not yet have a workspace.
+ * ────────────────────────────────────────────────────────── */
 teamRouter.get(
   "/auth/invitations/:token",
   validate(inviteTokenParamSchema),
@@ -40,8 +45,19 @@ teamRouter.post(
   acceptInvite
 );
 
-/* ── Authenticated workspace endpoints ── */
-teamRouter.use(protect);
+/* ──────────────────────────────────────────────────────────
+ *  Authenticated workspace endpoints
+ *
+ *  `tenantScope` is now enforced at the router level so every
+ *  route below this line guarantees `req.tenant.workspaceId`
+ *  exists and the actor belongs to a tenant workspace
+ *  (platform admins are blocked with 403 TENANT_SCOPE_REQUIRED).
+ *
+ *  This brings /team in line with /articles, /cms, /brand-voice,
+ *  /billing, /support, and /analytics — closing the documented
+ *  gap in tenantScopeMiddleware.js.
+ * ────────────────────────────────────────────────────────── */
+teamRouter.use("/team", protect, tenantScope);
 
 /* Read team — anyone in the workspace */
 teamRouter.get("/team", listTeam);

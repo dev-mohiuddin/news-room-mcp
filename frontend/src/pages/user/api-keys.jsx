@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Key,
   Plus,
@@ -38,50 +39,75 @@ import {
 } from "@/components/ui/dialog";
 import { staggerContainer, staggerItem } from "@/lib/animations";
 import { dateFormater, copyToClipboard } from "@/lib/utils";
-import { USER_API_KEYS, PROVIDER_KEYS } from "@/lib/mockData";
+import {
+  fetchApiKeys,
+  issueApiKey,
+  revokeApiKey as revokeApiKeyThunk,
+  fetchProviderKeys,
+  saveProviderKey,
+  removeProviderKey,
+  clearNewApiKeyToken,
+} from "@/redux/slice/user-slice";
+
+const SCOPE_OPTIONS = [
+  { value: "all", label: "All endpoints" },
+  { value: "read", label: "Read only" },
+  { value: "articles", label: "Articles only" },
+  { value: "research", label: "Research only" },
+];
 
 export default function APIKeysPage() {
-  const [keys, setKeys] = useState(USER_API_KEYS);
-  const [providers, setProviders] = useState(PROVIDER_KEYS);
+  const dispatch = useDispatch();
+  const { apiKeys, providerKeys, newApiKeyToken } = useSelector((s) => s.user);
+
   const [createOpen, setCreateOpen] = useState(false);
-  const [newKey, setNewKey] = useState(null); // shown once after creation
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [editProvider, setEditProvider] = useState(null);
 
-  const handleCreate = (name, scope) => {
-    const generated = `nrm_live_${Math.random().toString(36).slice(2, 10)}...${Math.random().toString(36).slice(2, 6)}`;
-    const item = {
-      id: `k${keys.length + 1}`,
-      name,
-      key: generated,
-      createdAt: new Date().toISOString(),
-      lastUsed: null,
-      scope,
-    };
-    setKeys((prev) => [item, ...prev]);
-    setNewKey(generated);
-    setCreateOpen(false);
-    toast.success("API key created");
+  useEffect(() => {
+    dispatch(fetchApiKeys());
+    dispatch(fetchProviderKeys());
+  }, [dispatch]);
+
+  const handleCreate = async (name, scope) => {
+    const res = await dispatch(issueApiKey({ name, scope }));
+    if (issueApiKey.fulfilled.match(res)) {
+      toast.success("API key created");
+      setCreateOpen(false);
+    } else {
+      toast.error(res.payload || "Could not create key");
+    }
   };
 
-  const handleDelete = () => {
-    if (deleteTarget) {
-      setKeys((prev) => prev.filter((k) => k.id !== deleteTarget.id));
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    const res = await dispatch(revokeApiKeyThunk(deleteTarget.id));
+    if (revokeApiKeyThunk.fulfilled.match(res)) {
       toast.success("Key revoked");
+    } else {
+      toast.error(res.payload || "Could not revoke key");
     }
     setDeleteTarget(null);
   };
 
-  const handleProviderSave = (id, value) => {
-    setProviders((prev) =>
-      prev.map((p) =>
-        p.id === id
-          ? { ...p, connected: !!value, masked: value ? `${value.slice(0, 6)}…${value.slice(-4)}` : "—" }
-          : p
-      )
-    );
-    setEditProvider(null);
-    toast.success("Provider key updated");
+  const handleProviderSave = async (provider, rawKey) => {
+    if (!rawKey?.trim()) {
+      const res = await dispatch(removeProviderKey(provider));
+      if (removeProviderKey.fulfilled.match(res)) {
+        toast.success("Provider key removed");
+        setEditProvider(null);
+      } else {
+        toast.error(res.payload || "Could not remove provider key");
+      }
+      return;
+    }
+    const res = await dispatch(saveProviderKey({ provider, rawKey }));
+    if (saveProviderKey.fulfilled.match(res)) {
+      toast.success("Provider key saved");
+      setEditProvider(null);
+    } else {
+      toast.error(res.payload || "Could not save provider key");
+    }
   };
 
   return (
@@ -96,7 +122,8 @@ export default function APIKeysPage() {
       <section>
         <h2 className="font-display text-xl mb-4">Provider keys (overrides)</h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Plug in your own keys to bypass platform limits or use your own billing.
+          Plug in your own keys to bypass platform limits or use your own
+          billing. Keys are encrypted with AES-256 at rest.
         </p>
         <motion.div
           variants={staggerContainer(0.06)}
@@ -104,8 +131,8 @@ export default function APIKeysPage() {
           animate="visible"
           className="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
-          {providers.map((p) => (
-            <motion.div key={p.id} variants={staggerItem}>
+          {providerKeys.map((p) => (
+            <motion.div key={p.provider} variants={staggerItem}>
               <GlassCard className="p-5 h-full flex flex-col">
                 <div className="flex items-center gap-3">
                   <span className="h-9 w-9 rounded-lg gradient-bg flex items-center justify-center">
@@ -125,7 +152,9 @@ export default function APIKeysPage() {
                 </div>
 
                 <div className="mt-4 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground font-mono">{p.masked}</span>
+                  <span className="text-muted-foreground font-mono">
+                    {p.masked}
+                  </span>
                   <Button
                     variant="glass"
                     size="sm"
@@ -155,7 +184,7 @@ export default function APIKeysPage() {
         </div>
 
         <DataTable
-          data={keys}
+          data={apiKeys}
           columns={[
             {
               key: "name",
@@ -172,22 +201,22 @@ export default function APIKeysPage() {
               header: "Key",
               render: (k) => (
                 <div className="flex items-center gap-2">
-                  <code className="text-xs font-mono text-muted-foreground">{k.key}</code>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyToClipboard(k.key);
-                    }}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
+                  <code className="text-xs font-mono text-muted-foreground">
+                    {k.keyPrefix}
+                    …
+                  </code>
                 </div>
               ),
             },
-            { key: "scope", header: "Scope" },
+            {
+              key: "scope",
+              header: "Scope",
+              render: (k) => (
+                <span className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {k.scope}
+                </span>
+              ),
+            },
             {
               key: "createdAt",
               header: "Created",
@@ -202,7 +231,9 @@ export default function APIKeysPage() {
               header: "Last used",
               render: (k) => (
                 <span className="text-xs text-muted-foreground">
-                  {k.lastUsed ? dateFormater(k.lastUsed, "MMM d, HH:mm") : "Never"}
+                  {k.lastUsedAt
+                    ? dateFormater(k.lastUsedAt, "MMM d, HH:mm")
+                    : "Never"}
                 </span>
               ),
             },
@@ -228,9 +259,12 @@ export default function APIKeysPage() {
         />
       </section>
 
-      {/* New key shown once */}
-      {newKey && (
-        <NewKeyBanner keyValue={newKey} onDismiss={() => setNewKey(null)} />
+      {/* New key shown once — token cleared on dismiss */}
+      {newApiKeyToken && (
+        <NewKeyBanner
+          keyValue={newApiKeyToken}
+          onDismiss={() => dispatch(clearNewApiKeyToken())}
+        />
       )}
 
       {/* Create dialog */}
@@ -274,7 +308,14 @@ function NewKeyBanner({ keyValue, onDismiss }) {
             <code className="flex-1 text-xs font-mono bg-black/30 rounded-md px-3 py-2 truncate">
               {keyValue}
             </code>
-            <Button size="sm" variant="glass" onClick={() => copyToClipboard(keyValue)}>
+            <Button
+              size="sm"
+              variant="glass"
+              onClick={() => {
+                copyToClipboard(keyValue);
+                toast.success("Copied to clipboard");
+              }}
+            >
               <Copy className="h-3.5 w-3.5" /> Copy
             </Button>
           </div>
@@ -289,7 +330,15 @@ function NewKeyBanner({ keyValue, onDismiss }) {
 
 function CreateKeyDialog({ open, onOpenChange, onCreate }) {
   const [name, setName] = useState("");
-  const [scope, setScope] = useState("All endpoints");
+  const [scope, setScope] = useState("all");
+
+  /* Reset on open */
+  useEffect(() => {
+    if (open) {
+      setName("");
+      setScope("all");
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -302,24 +351,43 @@ function CreateKeyDialog({ open, onOpenChange, onCreate }) {
         </DialogHeader>
         <div className="space-y-4 pt-2">
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Key name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1.5" placeholder="e.g. Production" />
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Key name
+            </Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="mt-1.5"
+              placeholder="e.g. Production"
+            />
           </div>
           <div>
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Scope</Label>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Scope
+            </Label>
             <Select value={scope} onValueChange={setScope}>
-              <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1.5">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="All endpoints">All endpoints</SelectItem>
-                <SelectItem value="Read only">Read only</SelectItem>
-                <SelectItem value="Articles + Research">Articles + Research</SelectItem>
+                {SCOPE_OPTIONS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter className="mt-4">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <GradientButton size="sm" onClick={() => onCreate(name || "Untitled", scope)} disabled={!name.trim()}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <GradientButton
+            size="sm"
+            onClick={() => onCreate(name.trim(), scope)}
+            disabled={!name.trim()}
+          >
             Create key
           </GradientButton>
         </DialogFooter>
@@ -331,17 +399,29 @@ function CreateKeyDialog({ open, onOpenChange, onCreate }) {
 function ProviderEditDialog({ provider, onClose, onSave }) {
   const [value, setValue] = useState("");
   const [show, setShow] = useState(false);
+
+  useEffect(() => {
+    if (provider) {
+      setValue("");
+      setShow(false);
+    }
+  }, [provider]);
+
   if (!provider) return null;
 
   return (
     <Dialog open={!!provider} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="glass border border-white/10">
         <DialogHeader>
-          <DialogTitle>{provider.connected ? "Update" : "Connect"} {provider.name}</DialogTitle>
+          <DialogTitle>
+            {provider.connected ? "Update" : "Connect"} {provider.name}
+          </DialogTitle>
           <DialogDescription>{provider.description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 pt-2">
-          <Label className="text-xs uppercase tracking-widest text-muted-foreground">API key</Label>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+            API key
+          </Label>
           <div className="relative">
             <Input
               type={show ? "text" : "password"}
@@ -355,20 +435,40 @@ function ProviderEditDialog({ provider, onClose, onSave }) {
               onClick={() => setShow((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             >
-              {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {show ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
             </button>
           </div>
           {provider.connected && (
-            <p className="text-xs text-muted-foreground">
-              Current: <span className="font-mono">{provider.masked}</span>. Leave empty to disconnect.
+            <p className="text-[11px] text-muted-foreground">
+              Leave empty and click <strong>Remove</strong> to disconnect this
+              provider override.
             </p>
           )}
         </div>
-        <DialogFooter className="mt-4">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => onSave(provider.id, value)}>
-            {value ? "Save key" : "Disconnect"}
+        <DialogFooter className="mt-4 gap-2">
+          {provider.connected && (
+            <Button
+              variant="ghost"
+              className="text-destructive"
+              onClick={() => onSave(provider.provider, "")}
+            >
+              Remove
+            </Button>
+          )}
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
           </Button>
+          <GradientButton
+            size="sm"
+            onClick={() => onSave(provider.provider, value)}
+            disabled={!value.trim()}
+          >
+            Save key
+          </GradientButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

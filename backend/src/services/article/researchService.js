@@ -329,3 +329,18 @@ export const runResearchStage = async ({
 
 export const buildPlainTextFromHtmlList = (paragraphs) =>
   paragraphs.map((p) => htmlToPlain(p.html || "")).join("\n\n");
+
+/* ──────────────────────────────────────────────────────────
+ *  Re-exported primitives
+ *
+ *  The standalone Research Hub (/api/v1/research/*) uses these
+ *  directly so paywall/robots/dedupe/summarize rules stay in a
+ *  single place. Do NOT duplicate this logic anywhere else.
+ * ────────────────────────────────────────────────────────── */
+export {
+  filterUsable as filterUsableCandidates,
+  scrapeOne as scrapeOneSource,
+  dedupe as dedupeScrapedSources,
+  summarizeBrief as summarizeSourcesAsBrief,
+  truncate as truncateExcerpt,
+};

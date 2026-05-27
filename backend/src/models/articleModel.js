@@ -297,6 +297,12 @@ const articleSchema = new mongoose.Schema(
     quotaIncrementApplied: { type: Boolean, default: false },
     quotaRefunded: { type: Boolean, default: false },
 
+    /* View counters — denormalized for cheap list rendering. Maintained
+       by the view-tracking pipeline; reset to 0 if we ever wipe ArticleView. */
+    viewsTotal: { type: Number, default: 0, index: true },
+    viewsLast30d: { type: Number, default: 0 },
+    lastViewedAt: { type: Date, default: null },
+
     /* Moderation (platform-side) */
     moderation: {
       type: new mongoose.Schema(

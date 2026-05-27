@@ -49,13 +49,22 @@ export const securityMiddleware = [
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "https://js.stripe.com"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
-        connectSrc: ["'self'", process.env.CLIENT_APP_ORIGIN || "http://localhost:5173"],
+        connectSrc: [
+          "'self'",
+          process.env.CLIENT_APP_ORIGIN || "http://localhost:5173",
+          "https://api.stripe.com",
+        ],
+        frameSrc: [
+          "'self'",
+          "https://js.stripe.com",
+          "https://hooks.stripe.com",
+          "https://checkout.stripe.com",
+        ],
         fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
         objectSrc: ["'none'"],
-        frameSrc: ["'none'"],
       },
     },
   }),

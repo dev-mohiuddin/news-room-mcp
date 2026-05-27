@@ -73,6 +73,12 @@ const userSchema = new mongoose.Schema(
     /* ── Password reset ── */
     passwordResetToken: { type: String, default: null, select: false },
     passwordResetExpires: { type: Date, default: null, select: false },
+
+    /* ── User-level preferences (timezone, language, notifications, …) ── */
+    preferences: {
+      type: mongoose.Schema.Types.Mixed,
+      default: () => ({}),
+    },
   },
   { timestamps: true, versionKey: false }
 );

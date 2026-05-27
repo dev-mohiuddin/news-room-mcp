@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Sparkles, Type, Link2, HelpCircle, BarChart3, Copy, Check } from "lucide-react";
+import {
+  Sparkles,
+  Type,
+  Link2,
+  HelpCircle,
+  BarChart3,
+  Copy,
+  Check,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import PageHeader from "@/components/shared/PageHeader";
@@ -8,9 +16,30 @@ import GradientButton from "@/components/shared/GradientButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
 import { copyToClipboard } from "@/lib/utils";
+import {
+  generateMeta,
+  generateSlug,
+  generateFAQ,
+  analyzeKeyword,
+} from "@/api/seo/seo";
+
+/**
+ * SEO Tools page — fully wired to /api/v1/seo/*.
+ *   - Meta:    POST /seo/meta     → { titles[], descriptions[] }
+ *   - Slug:    POST /seo/slug     → { primary, alternatives[] } (deterministic)
+ *   - FAQ:     POST /seo/faq      → { faqs[] }
+ *   - Keyword: POST /seo/keyword  → { volume, difficulty, cpc, intent, related[], aiEstimated }
+ *
+ * Every call surfaces a friendly toast on failure. The standard
+ * backend envelope { success, data, message } is honoured.
+ */
 
 export default function SEOToolsPage() {
   return (
@@ -23,52 +52,100 @@ export default function SEOToolsPage() {
 
       <Tabs defaultValue="meta">
         <TabsList>
-          <TabsTrigger value="meta" className="gap-1.5"><Type className="h-3.5 w-3.5" /> Meta Generator</TabsTrigger>
-          <TabsTrigger value="slug" className="gap-1.5"><Link2 className="h-3.5 w-3.5" /> Slug</TabsTrigger>
-          <TabsTrigger value="faq" className="gap-1.5"><HelpCircle className="h-3.5 w-3.5" /> FAQ</TabsTrigger>
-          <TabsTrigger value="keyword" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" /> Keyword</TabsTrigger>
+          <TabsTrigger value="meta" className="gap-1.5">
+            <Type className="h-3.5 w-3.5" /> Meta Generator
+          </TabsTrigger>
+          <TabsTrigger value="slug" className="gap-1.5">
+            <Link2 className="h-3.5 w-3.5" /> Slug
+          </TabsTrigger>
+          <TabsTrigger value="faq" className="gap-1.5">
+            <HelpCircle className="h-3.5 w-3.5" /> FAQ
+          </TabsTrigger>
+          <TabsTrigger value="keyword" className="gap-1.5">
+            <BarChart3 className="h-3.5 w-3.5" /> Keyword
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="meta"><MetaGenerator /></TabsContent>
-        <TabsContent value="slug"><SlugGenerator /></TabsContent>
-        <TabsContent value="faq"><FAQGenerator /></TabsContent>
-        <TabsContent value="keyword"><KeywordAnalyzer /></TabsContent>
+        <TabsContent value="meta">
+          <MetaGenerator />
+        </TabsContent>
+        <TabsContent value="slug">
+          <SlugGenerator />
+        </TabsContent>
+        <TabsContent value="faq">
+          <FAQGenerator />
+        </TabsContent>
+        <TabsContent value="keyword">
+          <KeywordAnalyzer />
+        </TabsContent>
       </Tabs>
     </div>
   );
 }
 
+/* ──────────────────────────────────────────────────────────
+ *  Meta Generator
+ * ────────────────────────────────────────────────────────── */
 function MetaGenerator() {
-  const [input, setInput] = useState("10 SEO Strategies That Work in 2026");
+  const [topic, setTopic] = useState("10 SEO Strategies That Work in 2026");
+  const [keyword, setKeyword] = useState("seo strategies 2026");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const generate = () => {
+  const generate = async () => {
+    if (!topic.trim()) return;
     setLoading(true);
-    setTimeout(() => {
-      setResults({
-        titles: [
-          { text: "10 SEO Strategies That Actually Work in 2026 (Tested)", chars: 54 },
-          { text: "The 2026 SEO Playbook: 10 Strategies for Real Rankings", chars: 55 },
-          { text: "What Works in SEO for 2026: 10 Proven Strategies", chars: 49 },
-        ],
-        descriptions: [
-          { text: "Discover the 10 SEO strategies that deliver real rankings in 2026. From AI overviews to schema markup — tested across 800+ articles.", chars: 138 },
-          { text: "Modern SEO has changed. Learn the 10 approaches that move the needle in 2026, backed by data from 1.2M ranking pages.", chars: 121 },
-        ],
+    try {
+      const res = await generateMeta({
+        topic: topic.trim(),
+        targetKeyword: keyword.trim() || undefined,
       });
+      if (!res?.success) {
+        toast.error(res?.message || "Could not generate meta");
+        return;
+      }
+      setResults(res.data);
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <GlassCard className="p-5">
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Article title or topic</Label>
-        <div className="flex gap-3 mt-1.5">
-          <Input value={input} onChange={(e) => setInput(e.target.value)} className="flex-1 bg-transparent border-white/10" placeholder="Paste your article title…" />
-          <GradientButton size="md" onClick={generate} disabled={loading || !input.trim()}>
-            {loading ? "Generating…" : <><Sparkles className="h-4 w-4" /> Generate</>}
+      <GlassCard className="p-5 space-y-3">
+        <div>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+            Article title or topic
+          </Label>
+          <Input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            className="mt-1.5 bg-transparent border-white/10"
+            placeholder="Paste your article title…"
+          />
+        </div>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Target keyword (optional)
+            </Label>
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="mt-1.5 bg-transparent border-white/10"
+              placeholder="e.g. seo strategies 2026"
+            />
+          </div>
+          <GradientButton
+            size="md"
+            onClick={generate}
+            disabled={loading || !topic.trim()}
+          >
+            {loading ? "Generating…" : (
+              <>
+                <Sparkles className="h-4 w-4" /> Generate
+              </>
+            )}
           </GradientButton>
         </div>
       </GlassCard>
@@ -78,7 +155,7 @@ function MetaGenerator() {
           <GlassCard className="p-5">
             <h3 className="font-display text-lg mb-3">Meta titles</h3>
             <div className="space-y-2">
-              {results.titles.map((t, i) => (
+              {results.titles?.map((t, i) => (
                 <ResultRow key={i} text={t.text} meta={`${t.chars} chars`} />
               ))}
             </div>
@@ -86,7 +163,7 @@ function MetaGenerator() {
           <GlassCard className="p-5">
             <h3 className="font-display text-lg mb-3">Meta descriptions</h3>
             <div className="space-y-2">
-              {results.descriptions.map((d, i) => (
+              {results.descriptions?.map((d, i) => (
                 <ResultRow key={i} text={d.text} meta={`${d.chars}/160 chars`} />
               ))}
             </div>
@@ -97,87 +174,167 @@ function MetaGenerator() {
   );
 }
 
+/* ──────────────────────────────────────────────────────────
+ *  Slug Generator (deterministic — instant)
+ * ────────────────────────────────────────────────────────── */
 function SlugGenerator() {
-  const [input, setInput] = useState("10 SEO Strategies That Work in 2026");
-  const [slug, setSlug] = useState("");
+  const [title, setTitle] = useState("10 SEO Strategies That Work in 2026");
+  const [primary, setPrimary] = useState("");
+  const [alts, setAlts] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const generate = () => {
+  const generate = async () => {
+    if (!title.trim()) return;
     setLoading(true);
-    setTimeout(() => {
-      setSlug("seo-strategies-2026");
+    try {
+      const res = await generateSlug({ title: title.trim() });
+      if (!res?.success) {
+        toast.error(res?.message || "Could not generate slug");
+        return;
+      }
+      setPrimary(res.data?.primary || "");
+      setAlts(res.data?.alternatives || []);
+    } finally {
       setLoading(false);
-    }, 600);
+    }
   };
 
   return (
     <div className="space-y-4">
       <GlassCard className="p-5">
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Article title</Label>
+        <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+          Article title
+        </Label>
         <div className="flex gap-3 mt-1.5">
-          <Input value={input} onChange={(e) => setInput(e.target.value)} className="flex-1 bg-transparent border-white/10" />
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="flex-1 bg-transparent border-white/10"
+          />
           <GradientButton size="md" onClick={generate} disabled={loading}>
-            {loading ? "…" : <><Link2 className="h-4 w-4" /> Generate slug</>}
+            {loading ? "…" : (
+              <>
+                <Link2 className="h-4 w-4" /> Generate slug
+              </>
+            )}
           </GradientButton>
         </div>
       </GlassCard>
 
-      {slug && (
+      {primary && (
         <GlassCard className="p-5">
           <h3 className="font-display text-lg mb-3">Suggested slug</h3>
-          <ResultRow text={`/${slug}`} meta="SEO-friendly, lowercase, hyphenated" />
-          <div className="mt-3 space-y-2">
-            <p className="text-xs text-muted-foreground">Alternatives:</p>
-            <ResultRow text="/10-seo-strategies-that-work-2026" meta="Long-form" />
-            <ResultRow text="/seo-strategies-guide-2026" meta="Compact" />
-          </div>
+          <ResultRow
+            text={`/${primary}`}
+            meta="SEO-friendly, lowercase, hyphenated"
+          />
+          {alts.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <p className="text-xs text-muted-foreground">Alternatives:</p>
+              {alts.map((alt, i) => (
+                <ResultRow key={i} text={`/${alt}`} meta="" />
+              ))}
+            </div>
+          )}
         </GlassCard>
       )}
     </div>
   );
 }
 
+/* ──────────────────────────────────────────────────────────
+ *  FAQ Generator
+ * ────────────────────────────────────────────────────────── */
 function FAQGenerator() {
-  const [input, setInput] = useState("");
+  const [topic, setTopic] = useState("");
+  const [keyword, setKeyword] = useState("");
   const [faqs, setFaqs] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  const generate = () => {
+  const generate = async () => {
+    if (!topic.trim()) return;
     setLoading(true);
-    setTimeout(() => {
-      setFaqs([
-        { q: "What's the most important SEO change in 2026?", a: "AI overviews now appear on 38% of queries. Optimizing for AI inclusion via schema markup and topical depth matters more than chasing the #1 organic spot." },
-        { q: "Do keywords still matter in 2026?", a: "Yes, but the unit of relevance is the topic, not the keyword. Pages that cover a topic comprehensively outrank pages stuffed with the exact-match keyword." },
-        { q: "How long should articles be in 2026?", a: "Top-ranking pages average 1,847 words. Length isn't a ranking factor on its own — depth and originality are." },
-        { q: "Is link-building still effective?", a: "Quality links from topically-relevant sites still help. But internal linking delivers more reliable lifts than manual outreach." },
-      ]);
+    try {
+      const res = await generateFAQ({
+        topic: topic.trim(),
+        targetKeyword: keyword.trim() || undefined,
+      });
+      if (!res?.success) {
+        toast.error(res?.message || "Could not generate FAQ");
+        return;
+      }
+      setFaqs(res.data?.faqs || []);
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
   return (
     <div className="space-y-4">
-      <GlassCard className="p-5">
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Paste article content (or topic)</Label>
-        <Textarea value={input} onChange={(e) => setInput(e.target.value)} rows={5} className="mt-1.5 bg-transparent border-white/10" placeholder="Paste your article text here…" />
-        <GradientButton size="md" className="mt-3" onClick={generate} disabled={loading}>
-          {loading ? "Generating…" : <><HelpCircle className="h-4 w-4" /> Generate FAQ</>}
-        </GradientButton>
+      <GlassCard className="p-5 space-y-3">
+        <div>
+          <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+            Topic
+          </Label>
+          <Input
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+            className="mt-1.5 bg-transparent border-white/10"
+            placeholder="e.g. SEO strategies for 2026"
+          />
+        </div>
+        <div className="flex gap-3 items-end">
+          <div className="flex-1">
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Target keyword (optional)
+            </Label>
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="mt-1.5 bg-transparent border-white/10"
+            />
+          </div>
+          <GradientButton
+            size="md"
+            onClick={generate}
+            disabled={loading || !topic.trim()}
+          >
+            {loading ? "Generating…" : (
+              <>
+                <HelpCircle className="h-4 w-4" /> Generate FAQ
+              </>
+            )}
+          </GradientButton>
+        </div>
       </GlassCard>
 
       {faqs.length > 0 && (
         <GlassCard className="p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display text-lg">Generated FAQ ({faqs.length})</h3>
-            <Button variant="glass" size="sm" onClick={() => { copyToClipboard(JSON.stringify(faqs, null, 2)); }}>
+            <h3 className="font-display text-lg">
+              Generated FAQ ({faqs.length})
+            </h3>
+            <Button
+              variant="glass"
+              size="sm"
+              onClick={() => {
+                copyToClipboard(JSON.stringify(faqs, null, 2));
+                toast.success("FAQ JSON copied");
+              }}
+            >
               <Copy className="h-3.5 w-3.5" /> Copy schema
             </Button>
           </div>
           <ul className="space-y-3">
             {faqs.map((f, i) => (
-              <li key={i} className="p-4 rounded-lg glass border border-white/5">
+              <li
+                key={i}
+                className="p-4 rounded-lg glass border border-white/5"
+              >
                 <p className="text-sm font-medium">{f.q}</p>
-                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">{f.a}</p>
+                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                  {f.a}
+                </p>
               </li>
             ))}
           </ul>
@@ -187,69 +344,125 @@ function FAQGenerator() {
   );
 }
 
+/* ──────────────────────────────────────────────────────────
+ *  Keyword Analyzer
+ * ────────────────────────────────────────────────────────── */
 function KeywordAnalyzer() {
   const [keyword, setKeyword] = useState("seo strategies 2026");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const analyze = () => {
+  const analyze = async (kw) => {
+    const trimmed = (kw ?? keyword).trim();
+    if (!trimmed) return;
+    setKeyword(trimmed);
     setLoading(true);
-    setTimeout(() => {
-      setResult({
-        keyword: keyword,
-        volume: 14800,
-        difficulty: 67,
-        cpc: 4.20,
-        intent: "Informational",
-        related: ["seo tips 2026", "best seo practices", "google ranking factors 2026", "ai seo strategy", "content seo 2026"],
-      });
+    try {
+      const res = await analyzeKeyword({ keyword: trimmed });
+      if (!res?.success) {
+        toast.error(res?.message || "Could not analyze keyword");
+        return;
+      }
+      setResult(res.data);
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   };
 
   return (
     <div className="space-y-4">
       <GlassCard className="p-5">
-        <Label className="text-xs uppercase tracking-widest text-muted-foreground">Keyword</Label>
+        <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+          Keyword
+        </Label>
         <div className="flex gap-3 mt-1.5">
-          <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} className="flex-1 bg-transparent border-white/10" />
-          <GradientButton size="md" onClick={analyze} disabled={loading}>
-            {loading ? "Analyzing…" : <><BarChart3 className="h-4 w-4" /> Analyze</>}
+          <Input
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            className="flex-1 bg-transparent border-white/10"
+          />
+          <GradientButton size="md" onClick={() => analyze()} disabled={loading}>
+            {loading ? "Analyzing…" : (
+              <>
+                <BarChart3 className="h-4 w-4" /> Analyze
+              </>
+            )}
           </GradientButton>
         </div>
       </GlassCard>
 
       {result && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <GlassCard className="p-5">
-            <h3 className="font-display text-lg mb-4">Metrics</h3>
-            <dl className="space-y-3">
-              <Metric label="Search volume" value={`${result.volume.toLocaleString()} / mo`} />
-              <Metric label="Difficulty" value={`${result.difficulty}/100`} color={result.difficulty > 70 ? "text-red-400" : result.difficulty > 40 ? "text-amber-400" : "text-emerald-400"} />
-              <Metric label="CPC" value={`$${result.cpc.toFixed(2)}`} />
-              <Metric label="Intent" value={result.intent} />
-            </dl>
-          </GlassCard>
+        <>
+          {result.aiEstimated && (
+            <p className="text-[11px] text-muted-foreground italic">
+              Metrics are AI estimates — calibrate against your own analytics
+              before relying on them.
+            </p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <GlassCard className="p-5">
+              <h3 className="font-display text-lg mb-4">Metrics</h3>
+              <dl className="space-y-3">
+                <Metric
+                  label="Search volume"
+                  value={`${(result.volume || 0).toLocaleString()} / mo`}
+                />
+                <Metric
+                  label="Difficulty"
+                  value={`${result.difficulty || 0}/100`}
+                  color={
+                    result.difficulty > 70
+                      ? "text-red-400"
+                      : result.difficulty > 40
+                      ? "text-amber-400"
+                      : "text-emerald-400"
+                  }
+                />
+                <Metric
+                  label="CPC"
+                  value={`$${Number(result.cpc || 0).toFixed(2)}`}
+                />
+                <Metric label="Intent" value={result.intent || "—"} />
+              </dl>
+            </GlassCard>
 
-          <GlassCard className="p-5">
-            <h3 className="font-display text-lg mb-4">Related keywords</h3>
-            <ul className="space-y-2">
-              {result.related.map((r) => (
-                <li key={r} className="flex items-center justify-between p-2.5 rounded-lg glass border border-white/5">
-                  <span className="text-sm">{r}</span>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setKeyword(r); analyze(); }}>
-                    Analyze
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </GlassCard>
-        </div>
+            <GlassCard className="p-5">
+              <h3 className="font-display text-lg mb-4">Related keywords</h3>
+              {result.related?.length ? (
+                <ul className="space-y-2">
+                  {result.related.map((r) => (
+                    <li
+                      key={r}
+                      className="flex items-center justify-between p-2.5 rounded-lg glass border border-white/5"
+                    >
+                      <span className="text-sm">{r}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => analyze(r)}
+                      >
+                        Analyze
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No related keywords returned.
+                </p>
+              )}
+            </GlassCard>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
+/* ──────────────────────────────────────────────────────────
+ *  Shared bits
+ * ────────────────────────────────────────────────────────── */
 function ResultRow({ text, meta }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = () => {
@@ -259,10 +472,23 @@ function ResultRow({ text, meta }) {
   };
   return (
     <div className="flex items-center gap-2 p-3 rounded-lg glass border border-white/5 hover:border-white/15 group">
-      <span className="text-sm flex-1">{text}</span>
-      <span className="text-[10px] text-muted-foreground shrink-0">{meta}</span>
-      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={handleCopy}>
-        {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+      <span className="text-sm flex-1 break-all">{text}</span>
+      {meta ? (
+        <span className="text-[10px] text-muted-foreground shrink-0">
+          {meta}
+        </span>
+      ) : null}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={handleCopy}
+      >
+        {copied ? (
+          <Check className="h-3 w-3 text-emerald-400" />
+        ) : (
+          <Copy className="h-3 w-3" />
+        )}
       </Button>
     </div>
   );
@@ -272,7 +498,9 @@ function Metric({ label, value, color = "" }) {
   return (
     <div className="flex items-center justify-between border-b border-white/5 pb-2">
       <dt className="text-sm text-muted-foreground">{label}</dt>
-      <dd className={`text-sm font-semibold tabular-nums ${color}`}>{value}</dd>
+      <dd className={`text-sm font-semibold tabular-nums ${color}`}>
+        {value}
+      </dd>
     </div>
   );
 }

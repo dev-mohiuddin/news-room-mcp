@@ -22,6 +22,7 @@ import { runFactCheck } from "#services/article/factCheckService.js";
 import { generateAiCitationAssets } from "#services/article/aiCitationService.js";
 import { roundUsd } from "#constants/modelCosts.js";
 import * as quotaService from "#services/billing/quotaService.js";
+import * as notificationService from "#services/notification/notificationService.js";
 import { logAudit } from "#utils/auditLogger.js";
 import { emitProgress, emitDone, emitFailed } from "#socket/articleEvents.js";
 
@@ -103,6 +104,39 @@ const handleStageFailure = async ({
     status: targetStatus,
     failureReason: errorCode,
   });
+
+  // Persistent in-app notification — best effort, never throws.
+  try {
+    const userId = await resolveArticleOwner(workspaceId, articleId);
+    if (userId) {
+      await notificationService.notifyUser({
+        recipientUserId: userId,
+        workspaceId,
+        type: targetStatus === ARTICLE_STATUS.FAILED ? "error" : "warning",
+        category: "article",
+        title:
+          targetStatus === ARTICLE_STATUS.FAILED
+            ? "Article generation failed"
+            : "Article needs revision",
+        body: `Reason: ${errorCode}`,
+        link: `/dashboard/articles/${articleId}`,
+        metadata: { articleId: String(articleId), failureReason: errorCode },
+      });
+    }
+  } catch (err) {
+    logger.warn("[pipeline] failure notification skipped", {
+      message: err.message,
+    });
+  }
+};
+
+const resolveArticleOwner = async (workspaceId, articleId) => {
+  try {
+    const article = await findActiveArticleById(workspaceId, articleId);
+    return article?.createdBy?.toString() || null;
+  } catch {
+    return null;
+  }
 };
 
 /**
@@ -450,6 +484,28 @@ export const runArticlePipeline = async ({ articleId, workspaceId, userId }) => 
     articleId,
     status: ARTICLE_STATUS.DRAFT_READY,
   });
+
+  // Notify the author that their draft is ready. Best-effort; the article
+  // is already settled at this point so any failure here must not throw.
+  try {
+    await notificationService.notifyUser({
+      recipientUserId: userId,
+      workspaceId,
+      type: "success",
+      category: "article",
+      title: "Your article draft is ready",
+      body: settled.seo?.metaTitle || settled.topic || "Open the editor to review.",
+      link: `/dashboard/articles/${articleId}`,
+      metadata: {
+        articleId: String(articleId),
+        wordCount: settled.wordCount || 0,
+      },
+    });
+  } catch (err) {
+    logger.warn("[pipeline] success notification skipped", {
+      message: err.message,
+    });
+  }
 
   await logAudit({
     actor: { id: userId, role: "writer" },

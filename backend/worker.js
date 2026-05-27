@@ -16,6 +16,10 @@ import { startArticleWorker } from "#workers/articleWorker.js";
 import { startScheduledPublishWorker } from "#workers/scheduledPublishWorker.js";
 import { startScheduledPublishSweeper, stopScheduledPublishSweeper } from "#jobs/scheduledPublishSweeper.js";
 import { assertOriginalityConfig } from "#services/external/originalityProviders.js";
+// Eagerly import the socket module so the Redis adapter attaches at boot.
+// Without this, the worker only attaches on first emit — small jobs may
+// finish before pub/sub is ready and emits silently drop.
+import "#socket/server.js";
 
 dotenv.config();
 

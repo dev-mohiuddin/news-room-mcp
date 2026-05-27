@@ -114,3 +114,43 @@ export const updatePlan = (workspaceId, planName) =>
     { $set: { plan: planName } },
     { new: true }
   ).exec();
+
+/**
+ * Persist Stripe linkage. Called by webhook handlers after a checkout
+ * completes or a subscription updates. Accepts a partial set so each
+ * webhook only touches the fields it actually knows about.
+ */
+export const updateStripeLinkage = (workspaceId, set) =>
+  Subscription.findOneAndUpdate(
+    { workspaceId },
+    { $set: set },
+    { new: true }
+  ).exec();
+
+export const findByStripeCustomerId = (stripeCustomerId) =>
+  Subscription.findOne({ stripeCustomerId }).exec();
+
+export const findByStripeSubscriptionId = (stripeSubscriptionId) =>
+  Subscription.findOne({ stripeSubscriptionId }).exec();
+
+/**
+ * Move a Subscription onto a new plan code AND reset the period to the
+ * Stripe-driven dates. Called by the `customer.subscription.updated`
+ * webhook when the user upgrades/downgrades.
+ */
+export const applyPlanChange = (workspaceId, { plan, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd }) =>
+  Subscription.findOneAndUpdate(
+    { workspaceId },
+    {
+      $set: {
+        ...(plan ? { plan } : {}),
+        ...(status ? { status } : {}),
+        ...(currentPeriodStart ? { currentPeriodStart } : {}),
+        ...(currentPeriodEnd ? { currentPeriodEnd } : {}),
+        ...(typeof cancelAtPeriodEnd === "boolean"
+          ? { cancelAtPeriodEnd }
+          : {}),
+      },
+    },
+    { new: true }
+  ).exec();

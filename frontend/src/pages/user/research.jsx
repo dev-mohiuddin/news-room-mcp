@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { Search, Sparkles, BookOpen, ArrowRight, Save, FileText, Zap } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  Search,
+  Sparkles,
+  BookOpen,
+  Save,
+  FileText,
+  Zap,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 
@@ -11,8 +19,6 @@ import SourceCard from "@/components/user/SourceCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -20,43 +26,72 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fadeUp, staggerContainer, staggerItem } from "@/lib/animations";
-import { RESEARCH_SOURCES, RESEARCH_BRIEF } from "@/lib/mockData";
+import {
+  staggerContainer,
+  staggerItem,
+} from "@/lib/animations";
+import {
+  runTopicSearch,
+  runGenerateBrief,
+  toggleSourceSelected,
+  clearResearch,
+} from "@/redux/slice/research-slice";
+import { useState } from "react";
 
 export default function ResearchPage() {
+  const dispatch = useDispatch();
+  const { sources, selectedUrls, brief, isSearching, isGenerating } =
+    useSelector((s) => s.research);
+
   const [topic, setTopic] = useState("SEO strategies 2026");
   const [keyword, setKeyword] = useState("seo strategies 2026");
   const [depth, setDepth] = useState("deep");
-  const [searching, setSearching] = useState(false);
-  const [sources, setSources] = useState([]);
-  const [selected, setSelected] = useState([]);
-  const [brief, setBrief] = useState(null);
-  const [generatingBrief, setGeneratingBrief] = useState(false);
 
-  const handleSearch = () => {
-    setSearching(true);
-    setBrief(null);
-    setTimeout(() => {
-      setSources(RESEARCH_SOURCES);
-      setSelected([]);
-      setSearching(false);
-      toast.success(`Found ${RESEARCH_SOURCES.length} sources`);
-    }, 1200);
-  };
+  const selectedSources = useMemo(
+    () => sources.filter((s) => selectedUrls.includes(s.url)),
+    [sources, selectedUrls]
+  );
 
-  const toggleSource = (id) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+  const handleSearch = async () => {
+    if (!topic.trim()) return;
+    const res = await dispatch(
+      runTopicSearch({ topic: topic.trim(), targetKeyword: keyword.trim(), depth })
     );
+    if (runTopicSearch.fulfilled.match(res)) {
+      const count = res.payload?.sources?.length ?? 0;
+      if (count === 0) {
+        toast.warning(
+          "No sources found. Try a different topic or check provider configuration."
+        );
+      } else {
+        toast.success(`Found ${count} sources`);
+      }
+    } else {
+      toast.error(res.payload || "Search failed. Please try again.");
+    }
   };
 
-  const handleGenerateBrief = () => {
-    setGeneratingBrief(true);
-    setTimeout(() => {
-      setBrief(RESEARCH_BRIEF);
-      setGeneratingBrief(false);
+  const handleGenerateBrief = async () => {
+    if (selectedUrls.length === 0) {
+      toast.warning("Select at least one source first");
+      return;
+    }
+    const res = await dispatch(
+      runGenerateBrief({
+        topic: topic.trim(),
+        targetKeyword: keyword.trim(),
+        urls: selectedUrls,
+      })
+    );
+    if (runGenerateBrief.fulfilled.match(res)) {
       toast.success("Research brief generated");
-    }, 1500);
+    } else {
+      toast.error(res.payload || "Could not generate brief");
+    }
+  };
+
+  const handleClear = () => {
+    dispatch(clearResearch());
   };
 
   return (
@@ -65,33 +100,62 @@ export default function ResearchPage() {
         eyebrow="AI Research"
         title="Research Hub"
         subtitle="Search the web, score sources, and generate fact-backed research briefs in seconds."
+        actions={
+          sources.length > 0 ? (
+            <Button variant="ghost" size="sm" onClick={handleClear}>
+              Clear
+            </Button>
+          ) : null
+        }
       />
 
       {/* Input panel */}
       <GlassCard className="p-5 md:p-6">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           <div className="md:col-span-4">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Topic</Label>
-            <Input value={topic} onChange={(e) => setTopic(e.target.value)} className="mt-1.5 bg-transparent border-white/10" placeholder="e.g. AI content marketing" />
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Topic
+            </Label>
+            <Input
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              className="mt-1.5 bg-transparent border-white/10"
+              placeholder="e.g. AI content marketing"
+            />
           </div>
           <div className="md:col-span-3">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Target keyword</Label>
-            <Input value={keyword} onChange={(e) => setKeyword(e.target.value)} className="mt-1.5 bg-transparent border-white/10" placeholder="e.g. ai marketing" />
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Target keyword
+            </Label>
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="mt-1.5 bg-transparent border-white/10"
+              placeholder="e.g. ai marketing"
+            />
           </div>
           <div className="md:col-span-2">
-            <Label className="text-xs uppercase tracking-widest text-muted-foreground">Depth</Label>
+            <Label className="text-xs uppercase tracking-widest text-muted-foreground">
+              Depth
+            </Label>
             <Select value={depth} onValueChange={setDepth}>
-              <SelectTrigger className="mt-1.5 bg-transparent border-white/10"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 bg-transparent border-white/10">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="quick">Quick (3)</SelectItem>
+                <SelectItem value="quick">Quick (5)</SelectItem>
                 <SelectItem value="deep">Deep (10)</SelectItem>
-                <SelectItem value="comprehensive">Full (20)</SelectItem>
+                <SelectItem value="comprehensive">Full (15)</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="md:col-span-3">
-            <GradientButton className="w-full" onClick={handleSearch} disabled={searching || !topic.trim()}>
-              {searching ? (
+            <GradientButton
+              className="w-full"
+              onClick={handleSearch}
+              disabled={isSearching || !topic.trim()}
+            >
+              {isSearching ? (
                 <>
                   <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                   Searching…
@@ -113,10 +177,13 @@ export default function ResearchPage() {
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-lg">
-                Sources <span className="text-muted-foreground text-sm font-normal">({sources.length})</span>
+                Sources{" "}
+                <span className="text-muted-foreground text-sm font-normal">
+                  ({sources.length})
+                </span>
               </h3>
               <p className="text-xs text-muted-foreground">
-                {selected.length} selected
+                {selectedUrls.length} selected
               </p>
             </div>
 
@@ -130,8 +197,8 @@ export default function ResearchPage() {
                 <motion.div key={s.id} variants={staggerItem}>
                   <SourceCard
                     source={s}
-                    selected={selected.includes(s.id)}
-                    onToggle={toggleSource}
+                    selected={selectedUrls.includes(s.url)}
+                    onToggle={() => dispatch(toggleSourceSelected(s.url))}
                   />
                 </motion.div>
               ))}
@@ -141,22 +208,24 @@ export default function ResearchPage() {
           {/* Right panel */}
           <div className="space-y-4">
             <GlassCard className="p-5 sticky top-4">
-              <h4 className="font-display text-base mb-3">Selected ({selected.length})</h4>
-              {selected.length === 0 ? (
+              <h4 className="font-display text-base mb-3">
+                Selected ({selectedUrls.length})
+              </h4>
+              {selectedUrls.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   Check sources on the left to include them in your brief.
                 </p>
               ) : (
                 <ul className="space-y-1.5 mb-4">
-                  {selected.map((id) => {
-                    const s = sources.find((x) => x.id === id);
-                    return (
-                      <li key={id} className="text-xs text-muted-foreground truncate flex items-center gap-1.5">
-                        <span className="h-1.5 w-1.5 rounded-full gradient-bg shrink-0" />
-                        {s?.title}
-                      </li>
-                    );
-                  })}
+                  {selectedSources.map((s) => (
+                    <li
+                      key={s.id}
+                      className="text-xs text-muted-foreground truncate flex items-center gap-1.5"
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full gradient-bg shrink-0" />
+                      {s.title}
+                    </li>
+                  ))}
                 </ul>
               )}
 
@@ -164,9 +233,9 @@ export default function ResearchPage() {
                 className="w-full"
                 size="md"
                 onClick={handleGenerateBrief}
-                disabled={selected.length === 0 || generatingBrief}
+                disabled={selectedUrls.length === 0 || isGenerating}
               >
-                {generatingBrief ? (
+                {isGenerating ? (
                   <>
                     <span className="h-4 w-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
                     Generating…
@@ -198,11 +267,17 @@ export default function ResearchPage() {
                   </span>
                   <div>
                     <h3 className="font-display text-xl">Research Brief</h3>
-                    <p className="text-xs text-muted-foreground">{brief.keyword} · {selected.length} sources</p>
+                    <p className="text-xs text-muted-foreground">
+                      {brief.keyword} · {brief.sources?.length ?? 0} sources
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="glass" size="sm" onClick={() => toast.success("Brief saved")}>
+                  <Button
+                    variant="glass"
+                    size="sm"
+                    onClick={() => toast.success("Brief saved locally")}
+                  >
                     <Save className="h-3.5 w-3.5" /> Save
                   </Button>
                   <Link to="/dashboard/new-article">
@@ -215,33 +290,43 @@ export default function ResearchPage() {
 
               <div className="space-y-5">
                 <div>
-                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Thesis</h4>
+                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                    Thesis
+                  </h4>
                   <p className="text-sm leading-relaxed">{brief.thesis}</p>
                 </div>
 
-                <div>
-                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Key facts</h4>
-                  <ul className="space-y-2">
-                    {brief.keyFacts.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <Zap className="h-3.5 w-3.5 text-brand-teal mt-0.5 shrink-0" />
-                        <span className="text-muted-foreground">{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {brief.keyFacts?.length > 0 && (
+                  <div>
+                    <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      Key facts
+                    </h4>
+                    <ul className="space-y-2">
+                      {brief.keyFacts.map((f, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <Zap className="h-3.5 w-3.5 text-brand-teal mt-0.5 shrink-0" />
+                          <span className="text-muted-foreground">{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-                <div>
-                  <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Open questions</h4>
-                  <ul className="space-y-2">
-                    {brief.questions.map((q, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm">
-                        <span className="text-brand-violet font-bold">?</span>
-                        <span className="text-muted-foreground">{q}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {brief.questions?.length > 0 && (
+                  <div>
+                    <h4 className="text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                      Open questions
+                    </h4>
+                    <ul className="space-y-2">
+                      {brief.questions.map((q, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="text-brand-violet font-bold">?</span>
+                          <span className="text-muted-foreground">{q}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </GlassCard>
           </motion.div>

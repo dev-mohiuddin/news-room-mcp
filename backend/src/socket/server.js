@@ -2,6 +2,7 @@ import http from "node:http";
 import express from "express";
 import { Server } from "socket.io";
 import { getCorsOrigin } from "#config/corsConfig.js";
+import { createSharedRedis } from "#config/redisConfig.js";
 import { logger } from "#utils/logger.js";
 import { verifyAccessToken } from "#utils/jwtUtil.js";
 
@@ -14,9 +15,61 @@ export const io = new Server(server, {
   cors: { origin: corsOrigin, credentials: true },
 });
 
-// userId -> socketId map (in-memory; swap to Redis adapter for multi-instance)
-const userSocketMap = new Map();
+/* ──────────────────────────────────────────────────────────
+ *  Redis adapter — Requirement 13.x cross-process pub/sub
+ *
+ *  Without this, emits from the BullMQ worker process never
+ *  reach API-connected browsers. The adapter is loaded async +
+ *  best-effort: if `@socket.io/redis-adapter` is missing or
+ *  Redis is unreachable, we log and keep the default in-memory
+ *  adapter so single-process dev still works.
+ *
+ *  This module is imported by BOTH the API (app.js) and the
+ *  worker (worker.js → socket events). Both attach the same
+ *  adapter so emits travel via Redis pub/sub.
+ * ────────────────────────────────────────────────────────── */
+let adapterReady = false;
 
+const attachRedisAdapter = async () => {
+  try {
+    const mod = await import("@socket.io/redis-adapter").catch((err) => {
+      logger.warn(
+        "[socket] @socket.io/redis-adapter not installed — falling back to in-memory adapter (single-process only)",
+        { hint: "npm i @socket.io/redis-adapter", message: err.message }
+      );
+      return null;
+    });
+    if (!mod) return;
+
+    const pubClient = createSharedRedis();
+    const subClient = pubClient.duplicate();
+
+    pubClient.on("error", (err) =>
+      logger.error("[socket] redis pub error", { message: err.message })
+    );
+    subClient.on("error", (err) =>
+      logger.error("[socket] redis sub error", { message: err.message })
+    );
+
+    io.adapter(mod.createAdapter(pubClient, subClient));
+    adapterReady = true;
+    logger.info("[socket] Redis adapter attached — cross-process emits enabled");
+  } catch (err) {
+    logger.error(
+      "[socket] failed to attach Redis adapter — falling back to in-memory",
+      { message: err.message }
+    );
+  }
+};
+
+// Fire-and-forget; HTTP server start in app.js / worker.js doesn't block on this.
+attachRedisAdapter();
+
+export const isSocketAdapterClustered = () => adapterReady;
+
+/* ──────────────────────────────────────────────────────────
+ *  Cookie parsing helper for handshake
+ * ────────────────────────────────────────────────────────── */
 const parseCookies = (cookieHeader = "") => {
   const out = {};
   for (const part of cookieHeader.split(";")) {
@@ -27,19 +80,22 @@ const parseCookies = (cookieHeader = "") => {
   return out;
 };
 
-/**
- * Socket.io handshake auth — Requirement 13.8.
- * Accepts JWT from:
- *   1. socket.handshake.auth.token (preferred)
- *   2. socket.handshake.auth.accessToken (alias)
- *   3. cookie `access_token`
+/* ──────────────────────────────────────────────────────────
+ *  Socket.io handshake auth — Requirement 13.8.
+ *  Accepts JWT from:
+ *    1. socket.handshake.auth.token (preferred)
+ *    2. socket.handshake.auth.accessToken (alias)
+ *    3. cookie `access_token`
  *
- * On verification:
- *   - attaches { userId, workspaceId, role, roleScope } to socket.data
- *   - auto-joins room `workspace:{workspaceId}` if a workspaceId exists
+ *  On verification:
+ *    - attaches { userId, workspaceId, role, permissions } to socket.data
+ *    - auto-joins room `workspace:{workspaceId}` if a workspaceId exists
+ *    - auto-joins room `user:{userId}` for direct emits (replaces the
+ *      in-memory userSocketMap, which was per-process and broke
+ *      cross-process direct emits via emitToUser)
  *
- * Reject with `next(new Error("..."))` to disconnect.
- */
+ *  Reject with `next(new Error("..."))` to disconnect.
+ * ────────────────────────────────────────────────────────── */
 io.use((socket, next) => {
   try {
     const authPayload = socket.handshake.auth || {};
@@ -69,7 +125,7 @@ io.on("connection", (socket) => {
   const { userId, workspaceId } = socket.data.user || {};
   logger.info("Socket connected", { socketId: socket.id, userId, workspaceId });
 
-  if (userId) userSocketMap.set(String(userId), socket.id);
+  if (userId) socket.join(`user:${userId}`);
   if (workspaceId) socket.join(`workspace:${workspaceId}`);
 
   socket.on("disconnect", (reason) => {
@@ -78,7 +134,6 @@ io.on("connection", (socket) => {
       userId,
       reason,
     });
-    if (userId) userSocketMap.delete(String(userId));
   });
 
   socket.on("error", (err) => {
@@ -90,13 +145,20 @@ io.engine.on("connection_error", (err) => {
   logger.error("Socket engine connection error", { error: err.message });
 });
 
-/* ── Helpers ── */
-
+/* ──────────────────────────────────────────────────────────
+ *  Public emit helpers
+ *
+ *  These are SAFE to call from any process (API or worker) as
+ *  long as the Redis adapter is attached. With the adapter,
+ *  `io.to(room).emit(...)` publishes to Redis and every
+ *  Socket.io node delivers to its connected clients in that
+ *  room. Without the adapter, emits stay local — fine for
+ *  single-process dev.
+ * ────────────────────────────────────────────────────────── */
 export const emitToUser = (userId, event, payload) => {
   if (!userId) return;
   try {
-    const socketId = userSocketMap.get(String(userId));
-    if (socketId) io.to(socketId).emit(event, payload);
+    io.to(`user:${userId}`).emit(event, payload);
   } catch (err) {
     logger.error("Socket emit error", { userId, event, error: err.message });
   }

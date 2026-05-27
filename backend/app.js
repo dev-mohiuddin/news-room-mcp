@@ -21,6 +21,8 @@ import { requestLogger } from "#middlewares/loggingMiddleware.js";
 
 import { apiRouterV1 } from "#routes/v1/index.js";
 import healthRouter from "#routes/v1/health/healthRoute.js";
+import { stripeWebhookRouter } from "#routes/v1/billing/stripeWebhookRoute.js";
+import { maintenanceGuard } from "#middlewares/maintenanceMiddleware.js";
 
 import { setupSwagger } from "#config/swagger.js";
 import { startBackgroundJobs } from "#jobs/index.js";
@@ -62,6 +64,12 @@ if (shouldServeClientDist && !canServeClientDist) {
 }
 
 // ==========================================
+// STRIPE WEBHOOK — MUST be mounted BEFORE express.json() so the raw
+// request body is preserved for signature verification.
+// ==========================================
+app.use(stripeWebhookRouter);
+
+// ==========================================
 // API MIDDLEWARE STACK
 // ==========================================
 app.use(express.json({ limit: "2mb" }));
@@ -79,6 +87,7 @@ app.use(globalRateLimiter(1000, 15));
 setupSwagger(app);
 
 app.use("/api/health", healthRouter);
+app.use("/api", maintenanceGuard);
 app.use("/api", apiRouterV1);
 
 // ==========================================

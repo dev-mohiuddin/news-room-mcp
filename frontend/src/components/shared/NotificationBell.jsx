@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Bell, Check, ExternalLink } from "lucide-react";
+import { useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Bell, Check, ExternalLink, Trash2, Inbox } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import {
@@ -9,8 +10,13 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { dateFormater } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { dateFormater, cn } from "@/lib/utils";
+import {
+  fetchNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  deleteNotification,
+} from "@/redux/slice/notification-slice";
 
 const ICON_TONE = {
   info: "bg-blue-500/15 text-blue-400 border-blue-500/30",
@@ -19,59 +25,54 @@ const ICON_TONE = {
   error: "bg-red-500/15 text-red-400 border-red-500/30",
 };
 
-const DEMO_NOTIFICATIONS = [
-  {
-    id: "n1",
-    type: "warning",
-    title: "3 failed payments need attention",
-    body: "Customers may lose access soon. Retry charging or contact them.",
-    href: "/admin/billing",
-    at: new Date(Date.now() - 12 * 60 * 1000).toISOString(),
-    read: false,
-  },
-  {
-    id: "n2",
-    type: "info",
-    title: "New tenant signed up",
-    body: "ContentForge upgraded to Agency plan.",
-    href: "/admin/users",
-    at: new Date(Date.now() - 55 * 60 * 1000).toISOString(),
-    read: false,
-  },
-  {
-    id: "n3",
-    type: "success",
-    title: "Broadcast delivered",
-    body: "“New CMS integration: Sanity” — 4,453 recipients.",
-    href: "/admin/notifications",
-    at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-    read: true,
-  },
-  {
-    id: "n4",
-    type: "info",
-    title: "Settings updated",
-    body: "SMTP configuration changed by admin@newsroommcp.com.",
-    href: "/admin/logs",
-    at: new Date(Date.now() - 11 * 60 * 60 * 1000).toISOString(),
-    read: true,
-  },
-];
-
+/**
+ * Notification bell — renders the live inbox from the notification slice.
+ *
+ *  - Unread count badge updates instantly via socket events
+ *  - Popover open triggers a fresh inbox fetch (10 items)
+ *  - Click row → mark as read + navigate to its `link` if present
+ *  - "Mark all read" + per-row delete supported
+ */
 export default function NotificationBell({ variant = "user" }) {
-  const [items, setItems] = useState(DEMO_NOTIFICATIONS);
-  const unread = items.filter((i) => !i.read).length;
+  const dispatch = useDispatch();
 
-  const markAllRead = () =>
-    setItems((prev) => prev.map((it) => ({ ...it, read: true })));
+  const items = useSelector((s) => s.notifications.list);
+  const unread = useSelector((s) => s.notifications.unreadCount);
+  const isLoading = useSelector((s) => s.notifications.isLoading);
 
-  const markRead = (id) =>
-    setItems((prev) =>
-      prev.map((it) => (it.id === id ? { ...it, read: true } : it))
-    );
+  /* Hydrate the inbox on mount so the bell is non-empty even before opening. */
+  useEffect(() => {
+    dispatch(fetchNotifications({ perPage: 10 }));
+  }, [dispatch]);
+
+  const handleOpenChange = (open) => {
+    if (open) dispatch(fetchNotifications({ perPage: 10 }));
+  };
+
+  const handleRowClick = (n) => {
+    if (!n.read) dispatch(markNotificationRead(n._id));
+    if (n.link) {
+      window.location.href = n.link;
+    }
+  };
+
+  const handleMarkAllRead = (e) => {
+    e?.stopPropagation();
+    dispatch(markAllNotificationsRead());
+  };
+
+  const handleDelete = (e, id) => {
+    e.stopPropagation();
+    dispatch(deleteNotification(id));
+  };
+
+  const goToFullInbox = () => {
+    window.location.href =
+      variant === "admin" ? "/admin/notifications" : "/dashboard/support";
+  };
 
   return (
-    <Popover>
+    <Popover onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -89,7 +90,7 @@ export default function NotificationBell({ variant = "user" }) {
                 exit={{ scale: 0 }}
                 className="absolute -top-0.5 -right-0.5 h-4 min-w-[16px] px-1 rounded-full bg-brand-pink text-[10px] font-bold text-white flex items-center justify-center border-2 border-background"
               >
-                {unread}
+                {unread > 99 ? "99+" : unread}
               </motion.span>
             )}
           </AnimatePresence>
@@ -101,7 +102,7 @@ export default function NotificationBell({ variant = "user" }) {
 
       <PopoverContent
         align="end"
-        className="w-[360px] p-0 overflow-hidden border-white/10"
+        className="w-[380px] p-0 overflow-hidden border-white/10"
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
           <div>
@@ -114,7 +115,7 @@ export default function NotificationBell({ variant = "user" }) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={markAllRead}
+              onClick={handleMarkAllRead}
               className="text-xs text-muted-foreground"
             >
               <Check className="h-3 w-3" /> Mark all read
@@ -122,19 +123,24 @@ export default function NotificationBell({ variant = "user" }) {
           )}
         </div>
 
-        <ScrollArea className="max-h-[360px]">
-          {items.length === 0 ? (
+        <ScrollArea className="max-h-[380px]">
+          {isLoading && items.length === 0 ? (
             <div className="p-8 text-center text-sm text-muted-foreground">
+              Loading…
+            </div>
+          ) : items.length === 0 ? (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              <Inbox className="h-8 w-8 mx-auto mb-2 opacity-40" />
               No notifications yet.
             </div>
           ) : (
             <ul className="divide-y divide-white/5">
               {items.map((it) => (
                 <li
-                  key={it.id}
-                  onClick={() => markRead(it.id)}
+                  key={it._id}
+                  onClick={() => handleRowClick(it)}
                   className={cn(
-                    "px-4 py-3 cursor-pointer transition-colors hover:bg-white/[0.03]",
+                    "px-4 py-3 cursor-pointer transition-colors hover:bg-white/[0.03] group",
                     !it.read && "bg-primary/[0.04]"
                   )}
                 >
@@ -153,18 +159,31 @@ export default function NotificationBell({ variant = "user" }) {
                         <span
                           className={cn(
                             "text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full border shrink-0",
-                            ICON_TONE[it.type]
+                            ICON_TONE[it.type] || ICON_TONE.info
                           )}
                         >
                           {it.type}
                         </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                        {it.body}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/70 mt-1.5">
-                        {dateFormater(it.at, "MMM d, HH:mm")}
-                      </p>
+                      {it.body && (
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          {it.body}
+                        </p>
+                      )}
+                      <div className="flex items-center justify-between mt-1.5">
+                        <p className="text-[10px] text-muted-foreground/70">
+                          {dateFormater(it.createdAt, "MMM d, HH:mm")}
+                          <span className="mx-1">·</span>
+                          <span className="capitalize">{it.category}</span>
+                        </p>
+                        <button
+                          onClick={(e) => handleDelete(e, it._id)}
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition"
+                          aria-label="Delete notification"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -175,17 +194,12 @@ export default function NotificationBell({ variant = "user" }) {
 
         <div className="border-t border-white/10 px-4 py-2.5 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">
-            {items.length} total
+            {items.length} shown
           </span>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() =>
-              (window.location.href =
-                variant === "admin"
-                  ? "/admin/notifications"
-                  : "/dashboard/support")
-            }
+            onClick={goToFullInbox}
             className="text-xs"
           >
             View all <ExternalLink className="h-3 w-3" />

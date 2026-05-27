@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { Eye, TrendingUp, FileText, Award } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link } from "react-router-dom";
+import {
+  Eye,
+  TrendingUp,
+  FileText,
+  Award,
+  DollarSign,
+} from "lucide-react";
 import {
   AreaChart,
   Area,
@@ -18,11 +26,14 @@ import {
 
 import PageHeader from "@/components/shared/PageHeader";
 import KPICard from "@/components/shared/KPICard";
-import ChartCard, { CHART_PALETTE, CHART_GRID_COLOR, CHART_TICK_COLOR } from "@/components/shared/ChartCard";
+import ChartCard, {
+  CHART_PALETTE,
+  CHART_GRID_COLOR,
+  CHART_TICK_COLOR,
+} from "@/components/shared/ChartCard";
 import GlassCard from "@/components/shared/GlassCard";
 import DataTable from "@/components/shared/DataTable";
 import StatusBadge from "@/components/shared/StatusBadge";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -31,7 +42,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber, dateFormater } from "@/lib/utils";
-import { MY_ARTICLES, USER_DAILY_VIEWS, ARTICLE_PERFORMANCE_TRAFFIC } from "@/lib/mockData";
+import { fetchTenantReport } from "@/redux/slice/analytics-slice";
+import {
+  decorateDaily,
+  REFERRER_LABEL,
+  REFERRER_COLORS,
+  SEO_BAND_COLORS,
+} from "@/lib/analytics";
 
 const tooltipStyle = {
   background: "rgba(6,12,26,0.92)",
@@ -41,15 +58,35 @@ const tooltipStyle = {
   color: "#e2e8f0",
 };
 
-const TRAFFIC_COLORS = ["#3B82F6", "#8B5CF6", "#2DD4BF", "#F59E0B", "#EC4899"];
-
 export default function UserAnalyticsPage() {
+  const dispatch = useDispatch();
+  const data = useSelector((s) => s.analytics.tenantReport);
+  const isLoading = useSelector((s) => s.analytics.isLoading);
   const [range, setRange] = useState("30d");
 
-  const published = MY_ARTICLES.filter((a) => a.status === "published");
-  const totalViews = published.reduce((s, a) => s + a.views, 0);
-  const avgSeo = Math.round(published.reduce((s, a) => s + a.seoScore, 0) / (published.length || 1));
-  const topArticle = [...published].sort((a, b) => b.views - a.views)[0];
+  useEffect(() => {
+    dispatch(fetchTenantReport(range));
+  }, [dispatch, range]);
+
+  const summary = data?.summary || {};
+  const dailyArticles = useMemo(
+    () => decorateDaily(data?.daily?.articles || []),
+    [data]
+  );
+  const dailyViews = useMemo(
+    () => decorateDaily(data?.daily?.views || []),
+    [data]
+  );
+  const traffic = useMemo(
+    () =>
+      (data?.trafficSources || []).map((t) => ({
+        ...t,
+        label: REFERRER_LABEL[t.source] || t.source,
+      })),
+    [data]
+  );
+  const seoBands = data?.seoBands || [];
+  const top = data?.topArticles || [];
 
   return (
     <div className="space-y-6">
@@ -71,95 +108,266 @@ export default function UserAnalyticsPage() {
         }
       />
 
-      {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard icon={Eye} label="Total views" value={totalViews} trend={18.4} />
-        <KPICard icon={TrendingUp} label="Avg SEO score" value={avgSeo} suffix="/100" trend={3.2} glow="teal" />
-        <KPICard icon={FileText} label="Published" value={published.length} trend={12} />
-        <KPICard icon={Award} label="Top performer" value={topArticle?.views || 0} suffix=" views" glow="violet" />
+        <KPICard
+          icon={Eye}
+          label="Total views"
+          value={summary.totalViews || 0}
+          trend={summary.viewsTrendPct ?? null}
+        />
+        <KPICard
+          icon={FileText}
+          label="Published"
+          value={summary.published || 0}
+          glow="teal"
+        />
+        <KPICard
+          icon={DollarSign}
+          label="AI cost"
+          value={Number((summary.totalCostUsd || 0).toFixed(2))}
+          prefix="$"
+          decimals={2}
+        />
+        <KPICard
+          icon={Award}
+          label="Top performer"
+          value={top[0]?.viewsTotal || 0}
+          suffix=" views"
+          glow="violet"
+        />
       </div>
 
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <ChartCard className="lg:col-span-2" title="Views over time" subtitle={`Daily views · ${range}`} height={280}>
+        <ChartCard
+          className="lg:col-span-2"
+          title="Views over time"
+          subtitle={`Daily views · ${range}`}
+          height={280}
+        >
           <ResponsiveContainer>
-            <AreaChart data={USER_DAILY_VIEWS}>
+            <AreaChart data={dailyViews}>
               <defs>
                 <linearGradient id="viewsFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={CHART_PALETTE.blue} stopOpacity={0.5} />
-                  <stop offset="100%" stopColor={CHART_PALETTE.blue} stopOpacity={0} />
+                  <stop
+                    offset="0%"
+                    stopColor={CHART_PALETTE.blue}
+                    stopOpacity={0.5}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={CHART_PALETTE.blue}
+                    stopOpacity={0}
+                  />
                 </linearGradient>
               </defs>
               <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" />
-              <XAxis dataKey="day" stroke={CHART_TICK_COLOR} tick={{ fontSize: 11 }} />
+              <XAxis
+                dataKey="label"
+                stroke={CHART_TICK_COLOR}
+                tick={{ fontSize: 11 }}
+              />
               <YAxis stroke={CHART_TICK_COLOR} tick={{ fontSize: 11 }} />
               <Tooltip contentStyle={tooltipStyle} />
-              <Area type="monotone" dataKey="views" stroke={CHART_PALETTE.blue} strokeWidth={2.5} fill="url(#viewsFill)" />
+              <Area
+                type="monotone"
+                dataKey="views"
+                stroke={CHART_PALETTE.blue}
+                strokeWidth={2.5}
+                fill="url(#viewsFill)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </ChartCard>
 
         <ChartCard title="Traffic sources" height={280}>
+          {traffic.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+              No views yet.
+            </div>
+          ) : (
+            <ResponsiveContainer>
+              <PieChart>
+                <Pie
+                  data={traffic}
+                  dataKey="value"
+                  nameKey="label"
+                  innerRadius={55}
+                  outerRadius={85}
+                  paddingAngle={3}
+                  stroke="none"
+                >
+                  {traffic.map((_, i) => (
+                    <Cell
+                      key={i}
+                      fill={REFERRER_COLORS[i % REFERRER_COLORS.length]}
+                    />
+                  ))}
+                </Pie>
+                <Legend
+                  iconType="circle"
+                  wrapperStyle={{ fontSize: 11, color: CHART_TICK_COLOR }}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ChartCard
+          className="lg:col-span-2"
+          title="Articles per day"
+          subtitle="Created vs published"
+          height={260}
+        >
           <ResponsiveContainer>
-            <PieChart>
-              <Pie
-                data={ARTICLE_PERFORMANCE_TRAFFIC}
-                dataKey="value"
-                nameKey="source"
-                innerRadius={55}
-                outerRadius={85}
-                paddingAngle={3}
-                stroke="none"
-              >
-                {ARTICLE_PERFORMANCE_TRAFFIC.map((_, i) => (
-                  <Cell key={i} fill={TRAFFIC_COLORS[i % TRAFFIC_COLORS.length]} />
-                ))}
-              </Pie>
-              <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: CHART_TICK_COLOR }} />
-              <Tooltip contentStyle={tooltipStyle} />
-            </PieChart>
+            <BarChart data={dailyArticles}>
+              <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" />
+              <XAxis
+                dataKey="label"
+                stroke={CHART_TICK_COLOR}
+                tick={{ fontSize: 11 }}
+              />
+              <YAxis stroke={CHART_TICK_COLOR} tick={{ fontSize: 11 }} />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+              />
+              <Legend
+                iconType="circle"
+                wrapperStyle={{ fontSize: 11, color: CHART_TICK_COLOR }}
+              />
+              <Bar
+                dataKey="articles"
+                stackId="a"
+                fill={CHART_PALETTE.violet}
+                radius={[0, 0, 0, 0]}
+              />
+              <Bar
+                dataKey="published"
+                stackId="b"
+                fill={CHART_PALETTE.teal}
+                radius={[6, 6, 0, 0]}
+              />
+            </BarChart>
           </ResponsiveContainer>
+        </ChartCard>
+
+        <ChartCard title="SEO score distribution" height={260}>
+          {seoBands.length === 0 ? (
+            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+              Generate articles to see SEO data.
+            </div>
+          ) : (
+            <ResponsiveContainer>
+              <BarChart data={seoBands}>
+                <CartesianGrid
+                  stroke={CHART_GRID_COLOR}
+                  strokeDasharray="3 3"
+                />
+                <XAxis
+                  dataKey="band"
+                  stroke={CHART_TICK_COLOR}
+                  tick={{ fontSize: 11 }}
+                />
+                <YAxis
+                  stroke={CHART_TICK_COLOR}
+                  tick={{ fontSize: 11 }}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={tooltipStyle}
+                  cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {seoBands.map((b) => (
+                    <Cell
+                      key={b.band}
+                      fill={SEO_BAND_COLORS[b.band] || CHART_PALETTE.blue}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </ChartCard>
       </div>
 
       {/* Top articles table */}
       <div>
         <h3 className="font-display text-lg mb-3">Top performing articles</h3>
-        <DataTable
-          data={[...published].sort((a, b) => b.views - a.views)}
-          columns={[
-            {
-              key: "title",
-              header: "Article",
-              sortable: true,
-              render: (a) => <span className="font-medium text-sm truncate block max-w-[300px]">{a.title}</span>,
-            },
-            { key: "status", header: "Status", render: (a) => <StatusBadge status={a.status} /> },
-            {
-              key: "views",
-              header: "Views",
-              sortable: true,
-              render: (a) => <span className="tabular-nums text-sm">{formatNumber(a.views)}</span>,
-            },
-            {
-              key: "seoScore",
-              header: "SEO",
-              sortable: true,
-              render: (a) => (
-                <span className={`text-xs font-semibold tabular-nums ${a.seoScore >= 90 ? "text-emerald-400" : "text-blue-400"}`}>
-                  {a.seoScore}/100
-                </span>
-              ),
-            },
-            { key: "words", header: "Words", sortable: true, render: (a) => <span className="text-xs tabular-nums">{a.words}</span> },
-            {
-              key: "publishedAt",
-              header: "Published",
-              render: (a) => <span className="text-xs text-muted-foreground">{a.publishedAt ? dateFormater(a.publishedAt, "MMM d") : "—"}</span>,
-            },
-          ]}
-          pageSize={8}
-        />
+        {top.length === 0 ? (
+          <GlassCard className="p-8 text-center text-sm text-muted-foreground">
+            {isLoading
+              ? "Loading…"
+              : "No published articles yet. Generate and publish an article to see views and SEO data."}
+          </GlassCard>
+        ) : (
+          <DataTable
+            data={top}
+            columns={[
+              {
+                key: "title",
+                header: "Article",
+                sortable: true,
+                render: (a) => (
+                  <Link
+                    to={`/dashboard/articles/${a._id}`}
+                    className="font-medium text-sm truncate block max-w-[300px] hover:text-primary"
+                  >
+                    {a.title}
+                  </Link>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (a) => <StatusBadge status={a.status} />,
+              },
+              {
+                key: "viewsTotal",
+                header: "Views",
+                sortable: true,
+                render: (a) => (
+                  <span className="tabular-nums text-sm">
+                    {formatNumber(a.viewsTotal || 0)}
+                  </span>
+                ),
+              },
+              {
+                key: "wordCount",
+                header: "Words",
+                sortable: true,
+                render: (a) => (
+                  <span className="text-xs tabular-nums">
+                    {a.wordCount || 0}
+                  </span>
+                ),
+              },
+              {
+                key: "readingTimeMinutes",
+                header: "Read",
+                render: (a) => (
+                  <span className="text-xs tabular-nums">
+                    {a.readingTimeMinutes || 0} min
+                  </span>
+                ),
+              },
+              {
+                key: "publishedAt",
+                header: "Published",
+                render: (a) => (
+                  <span className="text-xs text-muted-foreground">
+                    {a.publishedAt
+                      ? dateFormater(a.publishedAt, "MMM d")
+                      : "—"}
+                  </span>
+                ),
+              },
+            ]}
+          />
+        )}
       </div>
     </div>
   );
