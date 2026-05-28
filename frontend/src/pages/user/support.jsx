@@ -43,7 +43,6 @@ import {
 } from "@/components/ui/dialog";
 import { fadeUp } from "@/lib/animations";
 import { dateFormater } from "@/lib/utils";
-import { USER_FAQS } from "@/lib/mockData";
 import {
   fetchMyTickets,
   fetchMyTicketStats,
@@ -57,6 +56,37 @@ import TicketThread, {
   STATUS_STYLES,
   PRIORITY_STYLES,
 } from "@/components/support/TicketThread";
+
+/**
+ * Static support FAQs — help content rendered on the support page.
+ * Not user data; keeping it inline so the page is self-contained.
+ */
+const SUPPORT_FAQS = [
+  {
+    q: "How do I connect my WordPress site?",
+    a: "Go to CMS Connections → Add Connection → WordPress. You'll need your site URL and an Application Password (not your login password).",
+  },
+  {
+    q: "Can I edit AI-generated drafts before publishing?",
+    a: "Absolutely. Every draft lands in our editor with full AI tools. You can rewrite, expand, or shorten any paragraph inline before publishing.",
+  },
+  {
+    q: "What happens if I exceed my monthly article limit?",
+    a: "We'll notify you at 80% usage. You can upgrade in one click, or buy a small overage pack from the Billing page.",
+  },
+  {
+    q: "How does Brand Voice training work?",
+    a: "Upload 3–5 sample articles in your style. We extract tone, vocabulary, and rhythm into a profile. Every new draft is generated against that profile.",
+  },
+  {
+    q: "Are my CMS credentials secure?",
+    a: "All credentials are encrypted with AES-256 at rest. We never store your password — only encrypted tokens.",
+  },
+  {
+    q: "Can I cancel my subscription anytime?",
+    a: "Yes. Cancel from Billing → Subscription. You'll keep access until the end of the current billing period.",
+  },
+];
 
 export default function UserSupportPage() {
   const dispatch = useDispatch();
@@ -248,7 +278,7 @@ export default function UserSupportPage() {
 
         <GlassCard className="p-3 md:p-5">
           <Accordion type="single" collapsible className="w-full">
-            {USER_FAQS.map((faq, i) => (
+            {SUPPORT_FAQS.map((faq, i) => (
               <AccordionItem key={i} value={`faq-${i}`} className="px-2">
                 <AccordionTrigger>{faq.q}</AccordionTrigger>
                 <AccordionContent>{faq.a}</AccordionContent>

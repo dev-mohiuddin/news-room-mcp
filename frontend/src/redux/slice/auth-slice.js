@@ -11,23 +11,37 @@ import {
 
 /* ──────────────────────────────────────────────────────────
  *  State shape
+ *
+ *  Single source of truth for AUTHENTICATION is the httpOnly
+ *  `access_token` cookie issued by the backend. The frontend
+ *  never holds a JWT — it can't because we cannot read httpOnly
+ *  cookies from JS, by design.
+ *
+ *  We DO cache the public `user` payload in localStorage so the
+ *  app can render the navbar / role-gated layout instantly on
+ *  page reload, without waiting for /auth/me. This cache is
+ *  treated as a hint only — `fetchCurrentUser` (called from
+ *  CheckAuth) refreshes it from the server on every boot, and
+ *  any 401 response clears it via `forceLogout`.
  * ────────────────────────────────────────────────────────── */
 const initialState = {
-  user: null,                // { id, name, email, role, permissions, ... }
-  accessToken: null,         // JWT for Authorization header
-  isAuthenticated: false,
+  user: null,                     // public profile payload (cached)
+  isAuthenticated: false,         // derived from `user` presence
   isLoading: false,
   error: null,
   pendingVerificationEmail: null, // set after register if OTP needed
 };
 
-/* ── Hydrate from localStorage on boot ── */
+/* ── Hydrate from localStorage on boot ──
+ *
+ * We only check for a cached `user` object. The actual auth state
+ * is verified on first /auth/me call; this cache just primes the
+ * UI so first paint isn't blank.
+ */
 try {
   const storedUser = localStorage.getItem("user");
-  const storedToken = localStorage.getItem("token");
-  if (storedUser && storedToken) {
+  if (storedUser) {
     initialState.user = JSON.parse(storedUser);
-    initialState.accessToken = storedToken;
     initialState.isAuthenticated = true;
   }
 } catch {
@@ -36,33 +50,37 @@ try {
 
 /* ──────────────────────────────────────────────────────────
  *  Helpers — persist auth result consistently
+ *
+ *  `persistAuth` runs after a successful login / register / verify.
+ *  We DO NOT store `accessToken` — it lives only in the httpOnly
+ *  cookie. Persisting the public `user` keeps the UI snappy
+ *  across page reloads.
  * ────────────────────────────────────────────────────────── */
 const persistAuth = (state, payload) => {
   const user = payload?.data?.user || null;
-  const token = payload?.data?.accessToken || null;
+  const requiresVerification = payload?.data?.requiresVerification === true;
 
-  if (user && token) {
+  if (user && !requiresVerification) {
     state.user = user;
-    state.accessToken = token;
     state.isAuthenticated = true;
+    state.pendingVerificationEmail = null;
     localStorage.setItem("user", JSON.stringify(user));
-    localStorage.setItem("token", token);
-  } else if (user && !token) {
-    // e.g. registration with requiresVerification = true
-    state.user = user;
-    state.accessToken = null;
+  } else if (user && requiresVerification) {
+    // Registration flow with OTP — user exists but is not yet authenticated.
+    state.user = null;
     state.isAuthenticated = false;
     state.pendingVerificationEmail = user.email;
+    localStorage.removeItem("user");
   }
 };
 
 const clearAuth = (state) => {
   state.user = null;
-  state.accessToken = null;
   state.isAuthenticated = false;
   state.error = null;
   state.pendingVerificationEmail = null;
   localStorage.removeItem("user");
+  /* Legacy key — drop if it lingers from older builds */
   localStorage.removeItem("token");
 };
 

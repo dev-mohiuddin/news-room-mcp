@@ -30,7 +30,7 @@ import {
 export default function NotificationSocketProvider({ children }) {
   const dispatch = useDispatch();
   const isAuthenticated = useSelector((s) => s.auth.isAuthenticated);
-  const accessToken = useSelector((s) => s.auth.accessToken);
+  const userId = useSelector((s) => s.auth.user?.id);
 
   /* Hydrate the badge once per session so the bell is correct on first render. */
   useEffect(() => {
@@ -95,7 +95,7 @@ export default function NotificationSocketProvider({ children }) {
       socket.off("notification:deleted", onDeleted);
       socket.off("notification:broadcast", onBroadcast);
     };
-  }, [dispatch, isAuthenticated, accessToken]);
+  }, [dispatch, isAuthenticated, userId]);
 
   return children ?? null;
 }

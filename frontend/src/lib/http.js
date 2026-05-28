@@ -6,16 +6,26 @@ const baseUrl = import.meta.env.VITE_API_URL;
 
 let isLoggingOut = false;
 
+/**
+ * Axios singleton.
+ *
+ * Authentication is carried by the httpOnly `access_token` cookie set
+ * by the backend on login/refresh/google-signin. We rely on
+ * `withCredentials: true` so cookies travel automatically — no
+ * `Authorization: Bearer` header is needed (or even desirable; it
+ * would be a second source of truth that can drift).
+ *
+ * For Socket.io handshakes, the cookie is read directly server-side
+ * (see backend/src/socket/server.js).
+ */
 const API = axios.create({
   baseURL: baseUrl,
   headers: { "Content-Type": "application/json" },
-  withCredentials: true, // send cookies (refresh_token, access_token)
+  withCredentials: true,
 });
 
 API.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
     startProgress();
     return config;
   },

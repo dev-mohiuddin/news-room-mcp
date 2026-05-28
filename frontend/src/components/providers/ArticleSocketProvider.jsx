@@ -16,7 +16,7 @@ import {
 export default function ArticleSocketProvider({ children }) {
   const dispatch = useDispatch();
   const isAuthenticated = useSelector((s) => s.auth.isAuthenticated);
-  const accessToken = useSelector((s) => s.auth.accessToken);
+  const userId = useSelector((s) => s.auth.user?.id);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -38,7 +38,7 @@ export default function ArticleSocketProvider({ children }) {
       socket.off("article:done", onDone);
       socket.off("article:failed", onFailed);
     };
-  }, [dispatch, isAuthenticated, accessToken]);
+  }, [dispatch, isAuthenticated, userId]);
 
   return children ?? null;
 }
