@@ -12,10 +12,13 @@
  */
 
 export const MODEL_COST_TABLE = Object.freeze({
-  // Sonnet — primary writing engine
+  // Sonnet 4.5 — current primary writing engine (published pricing)
+  "claude-sonnet-4-5-20250929": { inputPer1k: 0.003, outputPer1k: 0.015 },
+
+  // Sonnet 4 — kept for backwards compatibility with older logs
   "claude-sonnet-4-20250514": { inputPer1k: 0.003, outputPer1k: 0.015 },
 
-  // Haiku — fast/low-cost (SEO assets, alt text)
+  // Haiku 4.5 — fast/low-cost (SEO assets, alt text, research bullets)
   "claude-haiku-4-5-20251001": { inputPer1k: 0.0008, outputPer1k: 0.004 },
 
   // Sonnet 3.5 (older, fallback)

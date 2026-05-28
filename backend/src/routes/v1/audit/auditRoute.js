@@ -6,7 +6,7 @@ import { PERMISSIONS } from "#constants/roles.js";
 
 export const auditRouter = express.Router();
 
-auditRouter.use(protect);
+auditRouter.use("/admin/audit-logs", protect);
 
 auditRouter.get(
   "/admin/audit-logs",

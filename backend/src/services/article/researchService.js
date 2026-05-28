@@ -71,16 +71,24 @@ const dedupe = (sources) => {
   const kept = [];
   const skipped = [];
   for (const s of sources) {
-    if (seenUrl.has(s.canonical)) {
+    /**
+     * Source rows arrive shaped as `{ url, originalUrl, contentHash, ... }`,
+     * where `url` is already the canonical form. Older code looked at a
+     * non-existent `s.canonical` field, so every row after the first hashed
+     * to `undefined` and got dropped as `duplicate_url` — read the canonical
+     * form off `url` (with `canonical` as a defensive fallback).
+     */
+    const canonical = s.canonical || s.url;
+    if (canonical && seenUrl.has(canonical)) {
       skipped.push({ ...s, skipReason: "duplicate_url" });
       continue;
     }
-    if (seenHash.has(s.contentHash)) {
+    if (s.contentHash && seenHash.has(s.contentHash)) {
       skipped.push({ ...s, skipReason: "duplicate_content" });
       continue;
     }
-    seenUrl.add(s.canonical);
-    seenHash.add(s.contentHash);
+    if (canonical) seenUrl.add(canonical);
+    if (s.contentHash) seenHash.add(s.contentHash);
     kept.push(s);
   }
   return { kept, skipped };

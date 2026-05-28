@@ -14,6 +14,7 @@ import { connectDatabase } from "#config/dbConnect.js";
 import { logger } from "#utils/logger.js";
 import { startArticleWorker } from "#workers/articleWorker.js";
 import { startScheduledPublishWorker } from "#workers/scheduledPublishWorker.js";
+import { startEmailWorker } from "#workers/emailWorker.js";
 import { startScheduledPublishSweeper, stopScheduledPublishSweeper } from "#jobs/scheduledPublishSweeper.js";
 import { assertOriginalityConfig } from "#services/external/originalityProviders.js";
 // Eagerly import the socket module so the Redis adapter attaches at boot.
@@ -33,13 +34,18 @@ const start = async () => {
   }
   const articleWorker = startArticleWorker();
   const scheduledWorker = startScheduledPublishWorker();
+  const emailWorker = startEmailWorker();
   startScheduledPublishSweeper();
 
   const shutdown = async (signal) => {
     logger.info(`Worker received ${signal}; closing…`);
     try {
       stopScheduledPublishSweeper();
-      await Promise.allSettled([articleWorker.close(), scheduledWorker.close()]);
+      await Promise.allSettled([
+        articleWorker.close(),
+        scheduledWorker.close(),
+        emailWorker.close(),
+      ]);
     } finally {
       process.exit(0);
     }

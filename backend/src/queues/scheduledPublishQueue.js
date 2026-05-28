@@ -1,5 +1,5 @@
 import { Queue, QueueEvents } from "bullmq";
-import { createBullMqConnection } from "#config/redisConfig.js";
+import { createBullMqConnection, isRedisAvailable } from "#config/redisConfig.js";
 import { logger } from "#utils/logger.js";
 
 /**
@@ -41,8 +41,11 @@ let eventsSingleton = null;
 
 export const getScheduledPublishQueue = () => {
   if (queueSingleton) return queueSingleton;
+  if (!isRedisAvailable()) return null;
+  const connection = createBullMqConnection();
+  if (!connection) return null;
   queueSingleton = new Queue(SCHEDULED_PUBLISH_QUEUE_NAME, {
-    connection: createBullMqConnection(),
+    connection,
     defaultJobOptions: DEFAULT_JOB_OPTIONS,
   });
   queueSingleton.on("error", (err) => {
@@ -56,9 +59,10 @@ export const getScheduledPublishQueue = () => {
 
 export const getScheduledPublishQueueEvents = () => {
   if (eventsSingleton) return eventsSingleton;
-  eventsSingleton = new QueueEvents(SCHEDULED_PUBLISH_QUEUE_NAME, {
-    connection: createBullMqConnection(),
-  });
+  if (!isRedisAvailable()) return null;
+  const connection = createBullMqConnection();
+  if (!connection) return null;
+  eventsSingleton = new QueueEvents(SCHEDULED_PUBLISH_QUEUE_NAME, { connection });
   return eventsSingleton;
 };
 
@@ -86,6 +90,14 @@ export const enqueueScheduledPublish = async ({
   const delay = Math.max(0, target - Date.now());
 
   const queue = getScheduledPublishQueue();
+  if (!queue) {
+    const err = new Error(
+      "Scheduled-publish queue is unavailable. Start Redis or unset REDIS_DISABLED."
+    );
+    err.code = "QUEUE_UNAVAILABLE";
+    err.statusCode = 503;
+    throw err;
+  }
   const job = await queue.add(
     "publish",
     {
@@ -105,6 +117,7 @@ export const enqueueScheduledPublish = async ({
  */
 export const cancelScheduledPublish = async ({ jobId, articleId }) => {
   const queue = getScheduledPublishQueue();
+  if (!queue) return false;
   let job = null;
   if (jobId) job = await queue.getJob(String(jobId));
   if (!job && articleId) {

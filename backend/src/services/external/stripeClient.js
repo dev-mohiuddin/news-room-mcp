@@ -46,7 +46,13 @@ export const getStripe = () => {
     return null;
   }
   stripeSingleton = new Stripe(key, {
-    apiVersion: "2024-06-20",
+    /**
+     *  Pinned to the latest stable Stripe API release.
+     *  Bump deliberately — newer versions remove `invoice.subscription`
+     *  in favour of `invoice.parent.subscription_details.subscription`
+     *  (handled defensively in stripeWebhookService.js).
+     */
+    apiVersion: "2024-12-18.acacia",
     appInfo: { name: "Newsroom MCP", version: "1.0.0" },
     maxNetworkRetries: 2,
     timeout: 20_000,

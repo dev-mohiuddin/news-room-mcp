@@ -260,26 +260,52 @@ export const resendOtp = async ({ email }) => {
 
 /* ──────────────────────────────────────────────────────────
  *  Login (email + password)
+ *
+ *  Security note: every failure mode returns the SAME generic
+ *  message ("Invalid email or password") with status 401, so
+ *  attackers cannot distinguish:
+ *    - non-existent email
+ *    - wrong password
+ *    - unverified account
+ *    - suspended account
+ *    - Google-only account
+ *  An audit log entry captures the real reason server-side for
+ *  legitimate operators to diagnose.
  * ────────────────────────────────────────────────────────── */
+const LOGIN_GENERIC_ERROR = "Invalid email or password";
+
+const failLogin = async (reason, ctx, email = null) => {
+  // Audit-log the *real* reason for the operators
+  try {
+    await logAudit({
+      actorEmail: email || "unknown",
+      actorRole: "system",
+      category: "auth",
+      action: "auth.login_failed",
+      status: "failure",
+      metadata: { reason },
+      req: ctx?.req,
+    });
+  } catch {
+    /* best effort */
+  }
+  throwError(LOGIN_GENERIC_ERROR, 401);
+};
+
 export const login = async ({ email, password }, ctx = {}) => {
   const user = await findUserByEmail(email, { includePassword: true });
-  if (!user) throwError("Invalid email or password", 401);
+  if (!user) return failLogin("user_not_found", ctx, email);
 
-  if (!user.password) {
-    throwError(
-      "This account uses Google sign-in. Please continue with Google.",
-      400
-    );
-  }
+  if (!user.password) return failLogin("google_only_account", ctx, email);
 
   const valid = await user.comparePassword(password);
-  if (!valid) throwError("Invalid email or password", 401);
+  if (!valid) return failLogin("wrong_password", ctx, email);
 
-  if (!user.isActive) throwError("Account is suspended. Contact support.", 403);
+  if (!user.isActive) return failLogin("suspended", ctx, email);
 
   // In production, require email verification. In dev, allow through.
   if (!user.isVerified && !isDevelopment()) {
-    throwError("Please verify your email before logging in.", 403);
+    return failLogin("unverified", ctx, email);
   }
 
   const tokens = await issueTokensAndPersist(user, { req: ctx.req });

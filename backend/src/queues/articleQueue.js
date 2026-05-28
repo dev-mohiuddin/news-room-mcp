@@ -1,5 +1,5 @@
 import { Queue, QueueEvents } from "bullmq";
-import { createBullMqConnection } from "#config/redisConfig.js";
+import { createBullMqConnection, isRedisAvailable } from "#config/redisConfig.js";
 import { logger } from "#utils/logger.js";
 
 /**
@@ -38,9 +38,13 @@ let eventsSingleton = null;
 
 export const getArticleQueue = () => {
   if (queueSingleton) return queueSingleton;
+  if (!isRedisAvailable()) return null;
+
+  const connection = createBullMqConnection();
+  if (!connection) return null;
 
   queueSingleton = new Queue(ARTICLE_QUEUE_NAME, {
-    connection: createBullMqConnection(),
+    connection,
     defaultJobOptions: DEFAULT_JOB_OPTIONS,
   });
 
@@ -56,9 +60,10 @@ export const getArticleQueue = () => {
 
 export const getArticleQueueEvents = () => {
   if (eventsSingleton) return eventsSingleton;
-  eventsSingleton = new QueueEvents(ARTICLE_QUEUE_NAME, {
-    connection: createBullMqConnection(),
-  });
+  if (!isRedisAvailable()) return null;
+  const connection = createBullMqConnection();
+  if (!connection) return null;
+  eventsSingleton = new QueueEvents(ARTICLE_QUEUE_NAME, { connection });
   return eventsSingleton;
 };
 
@@ -76,6 +81,16 @@ export const enqueueArticleGeneration = async ({
     );
   }
   const queue = getArticleQueue();
+  if (!queue) {
+    /* Redis offline — surface a structured error so the controller
+     * can return 503 with a stable code instead of crashing. */
+    const err = new Error(
+      "Article generation queue is unavailable. Start Redis or unset REDIS_DISABLED."
+    );
+    err.code = "QUEUE_UNAVAILABLE";
+    err.statusCode = 503;
+    throw err;
+  }
   const job = await queue.add(
     "generate",
     { articleId: String(articleId), workspaceId: String(workspaceId), userId: String(userId) },
@@ -103,6 +118,7 @@ export const closeArticleQueue = async () => {
  */
 export const cancelArticleGeneration = async ({ jobId, articleId }) => {
   const queue = getArticleQueue();
+  if (!queue) return false;
   let job = null;
 
   if (jobId) {

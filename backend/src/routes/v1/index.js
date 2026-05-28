@@ -15,6 +15,7 @@ import { notificationRouter } from "#routes/v1/notification/notificationRoute.js
 import { planRouter } from "#routes/v1/billing/planRoute.js";
 import { billingRouter } from "#routes/v1/billing/billingRoute.js";
 import { settingsRouter } from "#routes/v1/system/settingsRoute.js";
+import { integrationRouter } from "#routes/v1/system/integrationRoute.js";
 import { supportRouter } from "#routes/v1/support/supportRoute.js";
 import { analyticsRouter } from "#routes/v1/analytics/analyticsRoute.js";
 
@@ -40,6 +41,7 @@ apiRouterV1.use("/v1", notificationRouter);
 apiRouterV1.use("/v1", planRouter);
 apiRouterV1.use("/v1", billingRouter);
 apiRouterV1.use("/v1", settingsRouter);
+apiRouterV1.use("/v1", integrationRouter);
 apiRouterV1.use("/v1", supportRouter);
 apiRouterV1.use("/v1", analyticsRouter);
 

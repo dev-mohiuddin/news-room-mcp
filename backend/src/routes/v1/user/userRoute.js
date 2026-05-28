@@ -60,7 +60,7 @@ import {
  * ============================================================ */
 export const adminUserRouter = express.Router();
 
-adminUserRouter.use(protect);
+adminUserRouter.use("/admin/users", protect);
 
 adminUserRouter.get(
   "/admin/users",

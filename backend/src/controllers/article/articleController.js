@@ -25,6 +25,7 @@ import {
 import { cancelScheduledPublish } from "#queues/scheduledPublishQueue.js";
 import { publishArticle as publishArticleService } from "#services/article/publishService.js";
 import { logAudit } from "#utils/auditLogger.js";
+import { isRedisAvailable } from "#config/redisConfig.js";
 
 /**
  * ============================================================
@@ -54,6 +55,19 @@ export const generateArticle = catchAsync(async (req, res) => {
   const { workspaceId, userId } = req.tenant;
   const { topic, targetKeyword, tone, targetWordCount, additionalKeywords } = req.body;
 
+  /* 0. Pre-flight queue check — fail fast BEFORE we touch the DB.
+   *    Without this, a Redis-down environment would create an orphan
+   *    article doc + a quota increment, then refund the quota on the
+   *    enqueue failure. The orphan article would still pollute every
+   *    analytics query (admin dashboard, user nav badge, etc.). */
+  if (!isRedisAvailable()) {
+    throwError(
+      "Article generation is temporarily unavailable. Please try again in a moment.",
+      503,
+      { code: "QUEUE_UNAVAILABLE" }
+    );
+  }
+
   // 1. Quota check + atomic reservation
   await quotaService.checkAndReserve(workspaceId);
 
@@ -81,12 +95,24 @@ export const generateArticle = catchAsync(async (req, res) => {
       await updateArticleFields(workspaceId, article._id, { jobId: String(jobId) });
     }
   } catch (err) {
-    // If the queue is down, refund the quota slot we just reserved.
-    logger.error("[articles] enqueue failed; refunding quota", {
+    /* Race condition: queue went down between our pre-flight check and
+     * the actual enqueue. Roll back BOTH the article doc (soft-delete so
+     * analytics stops counting it) AND the quota slot. */
+    logger.error("[articles] enqueue failed; rolling back article + quota", {
       message: err.message,
+      articleId: String(article._id),
     });
-    await quotaService.refund(workspaceId);
-    throwError("Article queue unavailable", 503);
+    await softDeleteArticle(workspaceId, article._id).catch((rollbackErr) =>
+      logger.error("[articles] rollback soft-delete failed", {
+        message: rollbackErr.message,
+      })
+    );
+    await quotaService.refund(workspaceId).catch((refundErr) =>
+      logger.error("[articles] rollback quota refund failed", {
+        message: refundErr.message,
+      })
+    );
+    throwError("Article queue unavailable", 503, { code: "QUEUE_UNAVAILABLE" });
   }
 
   await logAudit({
@@ -268,6 +294,16 @@ export const retryArticleHandler = catchAsync(async (req, res) => {
     throwError("Writers can only retry their own articles", 403);
   }
 
+  /* Pre-flight queue check — avoids leaving the article in DRAFT
+   * status with no job behind it (pipeline would never resume). */
+  if (!isRedisAvailable()) {
+    throwError(
+      "Article generation is temporarily unavailable. Please try again in a moment.",
+      503,
+      { code: "QUEUE_UNAVAILABLE" }
+    );
+  }
+
   // Atomic CAS: needs_revision → draft. The pipeline always starts from
   // draft and re-runs every stage cleanly, which is the safest reset.
   await transitionStatus({
@@ -294,8 +330,21 @@ export const retryArticleHandler = catchAsync(async (req, res) => {
       });
     }
   } catch (err) {
-    logger.error("[articles] retry enqueue failed", { message: err.message });
-    throwError("Article queue unavailable", 503);
+    /* Race: queue went down after pre-flight. Roll back the article to
+     * needs_revision so it stays consistent (it was needs_revision on
+     * entry, we just flipped it to draft + failed to enqueue). */
+    logger.error("[articles] retry enqueue failed; reverting to needs_revision", {
+      message: err.message,
+      articleId: String(article._id),
+    });
+    await transitionStatus({
+      workspaceId,
+      articleId: article._id,
+      from: ARTICLE_STATUS.DRAFT,
+      to: ARTICLE_STATUS.NEEDS_REVISION,
+      reason: "queue_unavailable",
+    }).catch(() => {});
+    throwError("Article queue unavailable", 503, { code: "QUEUE_UNAVAILABLE" });
   }
 
   await logAudit({

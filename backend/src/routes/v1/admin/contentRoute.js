@@ -12,7 +12,7 @@ import { PERMISSIONS } from "#constants/roles.js";
 
 export const adminContentRouter = express.Router();
 
-adminContentRouter.use(protect);
+adminContentRouter.use("/admin/articles", protect);
 
 /**
  * Mount path: /api/v1/admin/articles

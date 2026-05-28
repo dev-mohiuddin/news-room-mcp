@@ -70,6 +70,57 @@ const planCodeFromStripeSub = async (stripeSub) => {
   return plan?.code || null;
 };
 
+/* ──────────────────────────────────────────────────────────
+ *  Defensive helpers — Stripe field shapes change across API
+ *  versions. These accessors read both the legacy + modern
+ *  shapes so the API-version pin can be bumped without
+ *  rewriting handler code.
+ * ────────────────────────────────────────────────────────── */
+
+/** Find subscription id on an invoice across API versions. */
+const invoiceSubscriptionId = (invoice) => {
+  if (!invoice) return null;
+  // Legacy (≤ 2024-09-30): top-level `subscription`
+  if (typeof invoice.subscription === "string") return invoice.subscription;
+  if (invoice.subscription?.id) return invoice.subscription.id;
+  // Modern (2024-10+): nested under invoice.parent
+  const parent = invoice.parent?.subscription_details;
+  if (parent?.subscription) {
+    return typeof parent.subscription === "string"
+      ? parent.subscription
+      : parent.subscription?.id || null;
+  }
+  // Some events embed the subscription line item
+  const line = invoice.lines?.data?.[0]?.parent?.subscription_item_details;
+  if (line?.subscription) return line.subscription;
+  return null;
+};
+
+/** Find planCode metadata on an invoice across API versions. */
+const invoicePlanCodeMeta = (invoice) =>
+  invoice?.subscription_details?.metadata?.planCode ||
+  invoice?.parent?.subscription_details?.metadata?.planCode ||
+  invoice?.metadata?.planCode ||
+  null;
+
+/** Read current period start/end from a subscription (sub-level OR item-level). */
+const subscriptionPeriod = (stripeSub) => {
+  if (!stripeSub) return { start: null, end: null };
+  // Legacy: directly on the subscription
+  let start = stripeSub.current_period_start;
+  let end = stripeSub.current_period_end;
+  // Modern: pull from the first item
+  if (!start || !end) {
+    const item = stripeSub.items?.data?.[0];
+    start = start || item?.current_period_start;
+    end = end || item?.current_period_end;
+  }
+  return {
+    start: start ? new Date(start * 1000) : null,
+    end: end ? new Date(end * 1000) : null,
+  };
+};
+
 const subStatusFromStripe = (stripe) => {
   const map = {
     active: "active",
@@ -77,7 +128,13 @@ const subStatusFromStripe = (stripe) => {
     past_due: "past_due",
     canceled: "canceled",
     unpaid: "past_due",
-    incomplete: "active",
+    /**
+     *  Treat `incomplete` as past_due — closer to truth than
+     *  optimistically activating the workspace before the first
+     *  successful charge clears 3-D Secure. A subsequent
+     *  `customer.subscription.updated` flips it to `active`.
+     */
+    incomplete: "past_due",
     incomplete_expired: "canceled",
     paused: "canceled",
   };
@@ -147,12 +204,7 @@ const handleSubscriptionUpdated = async (event) => {
   const sub = event.data.object;
   const planCode = await planCodeFromStripeSub(sub);
   const status = subStatusFromStripe(sub.status);
-  const periodStart = sub.current_period_start
-    ? new Date(sub.current_period_start * 1000)
-    : null;
-  const periodEnd = sub.current_period_end
-    ? new Date(sub.current_period_end * 1000)
-    : null;
+  const { start: periodStart, end: periodEnd } = subscriptionPeriod(sub);
 
   let lookup = await findByStripeSubscriptionId(sub.id);
   if (!lookup && sub.customer) {
@@ -258,8 +310,9 @@ const handleInvoicePaid = async (event) => {
     if (byCustomer) workspaceId = byCustomer.workspaceId;
   }
 
-  const planCode = invoice.subscription_details?.metadata?.planCode || null;
+  const planCode = invoicePlanCodeMeta(invoice);
   const planDisplay = planCode ? (await findPlanByCode(planCode))?.displayName : null;
+  const subscriptionId = invoiceSubscriptionId(invoice);
   const charge = invoice.charge && typeof invoice.charge === "object"
     ? invoice.charge
     : null;
@@ -279,7 +332,7 @@ const handleInvoicePaid = async (event) => {
     stripeInvoiceId: invoice.id,
     stripeChargeId: typeof invoice.charge === "string" ? invoice.charge : charge?.id || null,
     stripeCustomerId: invoice.customer || null,
-    stripeSubscriptionId: invoice.subscription || null,
+    stripeSubscriptionId: subscriptionId,
     stripeHostedInvoiceUrl: invoice.hosted_invoice_url || null,
     stripeInvoicePdf: invoice.invoice_pdf || null,
     paymentMethodBrand: card?.brand || null,
@@ -317,7 +370,8 @@ const handleInvoicePaymentFailed = async (event) => {
     if (byCustomer) workspaceId = byCustomer.workspaceId;
   }
 
-  const planCode = invoice.subscription_details?.metadata?.planCode || null;
+  const planCode = invoicePlanCodeMeta(invoice);
+  const subscriptionId = invoiceSubscriptionId(invoice);
 
   await upsertByStripeInvoiceId(invoice.id, {
     workspaceId,
@@ -330,7 +384,7 @@ const handleInvoicePaymentFailed = async (event) => {
     attemptCount: invoice.attempt_count || 1,
     stripeInvoiceId: invoice.id,
     stripeCustomerId: invoice.customer || null,
-    stripeSubscriptionId: invoice.subscription || null,
+    stripeSubscriptionId: subscriptionId,
     stripeHostedInvoiceUrl: invoice.hosted_invoice_url || null,
     stripeInvoicePdf: invoice.invoice_pdf || null,
     failureMessage: invoice.last_finalization_error?.message ||
@@ -418,9 +472,81 @@ export const dispatchEvent = async (event) => {
   } catch (err) {
     logger.error("[webhook] handler crashed", {
       type: event.type,
+      eventId: event.id,
       message: err.message,
       stack: err.stack,
     });
+    /**
+     *  Dead-letter the failure:
+     *    1. Persistent audit log entry (`billing.webhook_dead_letter`)
+     *       so admins can inspect the raw event id + reason.
+     *    2. Best-effort super-admin notification so a human is alerted
+     *       to investigate before billing-related data goes stale.
+     *
+     *  Both are best-effort so we never re-throw and trigger another
+     *  Stripe retry storm — we always re-throw the original error to
+     *  the controller, which still 200s the response per design.
+     */
+    try {
+      await logAudit({
+        actorEmail: "stripe",
+        actorRole: "system",
+        category: "billing",
+        action: "webhook.dead_letter",
+        entityType: "stripe_event",
+        entityId: event.id,
+        status: "error",
+        after: {
+          type: event.type,
+          eventId: event.id,
+          message: err.message?.slice(0, 240),
+        },
+      });
+    } catch (auditErr) {
+      logger.warn("[webhook] dead-letter audit failed", {
+        message: auditErr.message,
+      });
+    }
+    try {
+      await notifySuperAdminsOfDeadLetter(event, err);
+    } catch (notifyErr) {
+      logger.warn("[webhook] dead-letter notification failed", {
+        message: notifyErr.message,
+      });
+    }
     throw err;
+  }
+};
+
+/**
+ *  Notify every active super-admin so a human is paged to investigate
+ *  webhook failures. Lazy-imported to avoid a circular dependency
+ *  between billing → notification → audit-logger.
+ */
+const notifySuperAdminsOfDeadLetter = async (event, err) => {
+  const { User } = await import("#models/userModel.js");
+  const { Role } = await import("#models/roleModel.js");
+  const superRole = await Role.findOne({ name: "super_admin" }).lean();
+  if (!superRole) return;
+  const admins = await User.find({
+    roleId: superRole._id,
+    isActive: true,
+  })
+    .select("_id")
+    .lean();
+  for (const admin of admins) {
+    await notificationService
+      .notifyUser({
+        recipientUserId: admin._id,
+        type: "error",
+        category: "system",
+        title: "Stripe webhook failed",
+        body: `Event ${event.type} (id ${event.id}) crashed: ${
+          err.message?.slice(0, 160) || "unknown error"
+        }`,
+        link: "/admin/billing",
+        metadata: { eventId: event.id, eventType: event.type },
+      })
+      .catch(() => {});
   }
 };

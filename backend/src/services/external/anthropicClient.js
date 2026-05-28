@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { logger } from "#utils/logger.js";
 import { computeUsdCost } from "#constants/modelCosts.js";
+import { getProviderConfig } from "#services/system/integrationService.js";
 
 /**
  * ============================================================
@@ -13,22 +14,46 @@ import { computeUsdCost } from "#constants/modelCosts.js";
  *  Tool-use is invoked via `useTool({ tools, toolName, … })` so callers
  *  receive structured output directly without prompt-engineering a
  *  "respond with JSON only" instruction.
+ *
+ *  Key resolution:
+ *    1. Admin-managed integration record (integrationService cache, 10s)
+ *    2. ANTHROPIC_API_KEY env var
+ *  We re-instantiate the SDK if the resolved key changes — admins can
+ *  rotate keys live without restarting the API.
  */
 
 let clientSingleton = null;
+let lastKeyHash = null;
 
-const getClient = () => {
-  if (clientSingleton) return clientSingleton;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+const hashKey = (k) => {
+  if (!k) return null;
+  return `${k.slice(0, 8)}:${k.length}`;
+};
+
+const resolveKey = async () => {
+  try {
+    const cfg = await getProviderConfig("anthropic");
+    if (cfg?.apiKey) return cfg.apiKey;
+  } catch {
+    /* fall through to env */
+  }
+  return process.env.ANTHROPIC_API_KEY || null;
+};
+
+const getClient = async () => {
+  const apiKey = await resolveKey();
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not configured");
   }
+  const sig = hashKey(apiKey);
+  if (clientSingleton && lastKeyHash === sig) return clientSingleton;
   clientSingleton = new Anthropic({ apiKey });
+  lastKeyHash = sig;
   return clientSingleton;
 };
 
 export const SONNET_MODEL =
-  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514";
+  process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929";
 export const HAIKU_MODEL =
   process.env.ANTHROPIC_HAIKU_MODEL || "claude-haiku-4-5-20251001";
 
@@ -43,7 +68,7 @@ export const generateText = async ({
   temperature = 0.7,
   stopSequences,
 } = {}) => {
-  const client = getClient();
+  const client = await getClient();
   const start = Date.now();
   const response = await client.messages.create({
     model,
@@ -93,7 +118,7 @@ export const useTool = async ({
   maxTokens = 4096,
   temperature = 0.4,
 } = {}) => {
-  const client = getClient();
+  const client = await getClient();
   const start = Date.now();
 
   const response = await client.messages.create({

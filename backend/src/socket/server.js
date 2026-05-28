@@ -2,7 +2,7 @@ import http from "node:http";
 import express from "express";
 import { Server } from "socket.io";
 import { getCorsOrigin } from "#config/corsConfig.js";
-import { createSharedRedis } from "#config/redisConfig.js";
+import { createSharedRedis, isRedisAvailable } from "#config/redisConfig.js";
 import { logger } from "#utils/logger.js";
 import { verifyAccessToken } from "#utils/jwtUtil.js";
 
@@ -31,6 +31,14 @@ export const io = new Server(server, {
 let adapterReady = false;
 
 const attachRedisAdapter = async () => {
+  /* Skip entirely when Redis is disabled — keeps single-process dev clean. */
+  if (!isRedisAvailable()) {
+    logger.info(
+      "[socket] Redis disabled — using in-memory adapter (single-process mode)"
+    );
+    return;
+  }
+
   try {
     const mod = await import("@socket.io/redis-adapter").catch((err) => {
       logger.warn(
@@ -42,7 +50,13 @@ const attachRedisAdapter = async () => {
     if (!mod) return;
 
     const pubClient = createSharedRedis();
-    const subClient = pubClient.duplicate();
+    const subClient = pubClient ? pubClient.duplicate() : null;
+    if (!pubClient || !subClient) {
+      logger.info(
+        "[socket] Redis client unavailable — using in-memory adapter"
+      );
+      return;
+    }
 
     pubClient.on("error", (err) =>
       logger.error("[socket] redis pub error", { message: err.message })
@@ -62,8 +76,13 @@ const attachRedisAdapter = async () => {
   }
 };
 
-// Fire-and-forget; HTTP server start in app.js / worker.js doesn't block on this.
-attachRedisAdapter();
+// Defer adapter wiring to next tick so dotenv.config() in app.js / worker.js
+// has run and `process.env.REDIS_DISABLED` is observable.
+setImmediate(() => {
+  attachRedisAdapter().catch((err) => {
+    logger.error("[socket] adapter init crashed", { message: err.message });
+  });
+});
 
 export const isSocketAdapterClustered = () => adapterReady;
 

@@ -31,8 +31,15 @@ export const roleRouter = express.Router();
  * `platform.role:manage` permission OR super_admin (wildcard).
  *
  * Mount path: /api/v1/admin/roles
+ *
+ * IMPORTANT: the middleware is scoped to `/admin/roles` so it only
+ * fires on its own paths. A bare `router.use(protect, requirePermission)`
+ * would run on EVERY request that traverses this router (because
+ * `apiRouterV1.use("/v1", roleRouter)` lets Express try each child
+ * router's middleware chain in order), causing false 403s on every
+ * other endpoint.
  */
-roleRouter.use(protect, requirePermission(PERMISSIONS.PLATFORM_ROLE_MANAGE));
+roleRouter.use("/admin/roles", protect, requirePermission(PERMISSIONS.PLATFORM_ROLE_MANAGE));
 
 /* ── Read ── */
 roleRouter.get("/admin/roles", listRoles);

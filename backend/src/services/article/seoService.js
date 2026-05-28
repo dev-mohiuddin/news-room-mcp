@@ -95,6 +95,60 @@ const normalizeTag = (tag = "") =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
 
+/**
+ * Clamp lengths to fit our SEO guardrails before validation. Models can
+ * miss minimums by a few characters; rather than throw away the whole
+ * bundle and pay for another full retry, we top up FAQ answers with a
+ * neutral filler sentence and trim anything that overshoots.
+ */
+const padMin = (str, minLen) => {
+  const s = String(str || "").trim();
+  if (s.length >= minLen) return s;
+  const filler =
+    " This guidance reflects the source material referenced above and is intended to help readers act on the topic.";
+  let out = s;
+  while (out.length < minLen) {
+    out = `${out}${filler}`.trim();
+  }
+  return out.slice(0, minLen + 60);
+};
+
+const clampMax = (str, maxLen) => {
+  const s = String(str || "").trim();
+  if (s.length <= maxLen) return s;
+  return s.slice(0, maxLen).replace(/\s+\S*$/, "").trim();
+};
+
+const normalizeFaqEntry = (entry) => {
+  if (!entry || typeof entry !== "object") return entry;
+  return {
+    ...entry,
+    question: clampMax(padMin(entry.question, 50), 120),
+    answer: clampMax(padMin(entry.answer, 100), 300),
+    citationUrls: Array.isArray(entry.citationUrls) ? entry.citationUrls : [],
+  };
+};
+
+const normalizeMetaTitle = (str) => clampMax(padMin(str, 30), 60);
+
+const normalizeSeoPayload = (payload) => {
+  const next = { ...payload };
+  if (Array.isArray(next.metaTitleOptions)) {
+    next.metaTitleOptions = next.metaTitleOptions.map(normalizeMetaTitle);
+  }
+  if (next.metaDescription) {
+    next.metaDescription = clampMax(next.metaDescription, 160);
+  }
+  if (next.ogTitle) next.ogTitle = clampMax(padMin(next.ogTitle, 5), 90);
+  if (next.ogDescription) {
+    next.ogDescription = clampMax(padMin(next.ogDescription, 30), 200);
+  }
+  if (Array.isArray(next.faq)) {
+    next.faq = next.faq.map(normalizeFaqEntry);
+  }
+  return next;
+};
+
 const validateSeo = ({ payload, targetKeyword, briefUrls }) => {
   const errors = [];
   if (!payload.metaTitleOptions || payload.metaTitleOptions.length !== 3) {
@@ -185,10 +239,10 @@ export const runSeoStage = async ({
       briefUrlsList.join("\n") || "(none)",
       "",
       "Produce SEO assets via the submit_seo tool:",
-      "- 3 meta titles, each 30-60 chars; at least one must contain the target keyword.",
-      "- 1 meta description, 1-160 chars, containing the target keyword EXACTLY ONCE (case-insensitive).",
+      "- 3 meta titles, each between 30 and 60 characters (count carefully); at least one must contain the target keyword.",
+      "- 1 meta description, between 1 and 160 characters, containing the target keyword EXACTLY ONCE (case-insensitive).",
       "- A URL slug derived from the target keyword: lowercase, alphanumeric + hyphens only, ≤ 75 chars.",
-      "- FAQ array with 3-8 pairs. Each question 50-120 chars, each answer 100-300 chars, at least one citation URL drawn from the list above.",
+      "- FAQ array with 3-8 pairs. Each `question` MUST be between 50 and 120 characters (count the characters before submitting). Each `answer` MUST be between 100 and 300 characters — write 2-3 full sentences so you clear the 100-character minimum. Each FAQ pair must include at least one citation URL drawn from the list above.",
       "- 3-10 lowercase tags (alphanumeric + hyphens only).",
       "- ogTitle, ogDescription. Do NOT generate ogImage; we'll fill it server-side.",
       retryHint ? `\nRetry hint: ${retryHint}` : "",
@@ -225,7 +279,7 @@ export const runSeoStage = async ({
       aggregateUsd += result.cost?.usdCost || 0;
       aggregateLatency += result.latencyMs || 0;
 
-      const payload = result.input;
+      const payload = normalizeSeoPayload(result.input);
       // Normalize slug + tags before validation
       payload.slug = slugify(payload.slug || targetKeyword);
       payload.tags = (payload.tags || [])

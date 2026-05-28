@@ -1,4 +1,5 @@
 import { logger } from "#utils/logger.js";
+import { getProviderConfig } from "#services/system/integrationService.js";
 
 /**
  * ============================================================
@@ -9,9 +10,36 @@ import { logger } from "#utils/logger.js";
  *    [{ url, title, snippet, language }]
  *
  *  Per Requirement 2: 10 second per-request timeout, then fall back.
+ *
+ *  Key resolution order (per call):
+ *    1. Admin-managed integration record (DB, AES-encrypted)
+ *    2. Process env var
+ *
+ *  This means admins can rotate the keys live from /admin/integrations
+ *  without redeploying the API.
  */
 
 const SEARCH_TIMEOUT_MS = 10_000;
+
+const resolveBraveKey = async () => {
+  try {
+    const cfg = await getProviderConfig("brave");
+    if (cfg?.apiKey) return cfg.apiKey;
+  } catch {
+    /* fall through */
+  }
+  return process.env.BRAVE_SEARCH_API_KEY || null;
+};
+
+const resolveExaKey = async () => {
+  try {
+    const cfg = await getProviderConfig("exa");
+    if (cfg?.apiKey) return cfg.apiKey;
+  } catch {
+    /* fall through */
+  }
+  return process.env.EXA_API_KEY || null;
+};
 
 const fetchWithTimeout = async (url, options = {}, timeoutMs = SEARCH_TIMEOUT_MS) => {
   const controller = new AbortController();
@@ -27,7 +55,7 @@ const fetchWithTimeout = async (url, options = {}, timeoutMs = SEARCH_TIMEOUT_MS
 /* ── Brave Search ─────────────────────────────────────────── */
 
 export const braveSearch = async ({ query, count = 10 }) => {
-  const apiKey = process.env.BRAVE_SEARCH_API_KEY;
+  const apiKey = await resolveBraveKey();
   if (!apiKey) {
     logger.warn("Brave Search not configured; skipping");
     return [];
@@ -62,7 +90,7 @@ export const braveSearch = async ({ query, count = 10 }) => {
 /* ── Exa AI semantic search ───────────────────────────────── */
 
 export const exaSearch = async ({ query, numResults = 10 }) => {
-  const apiKey = process.env.EXA_API_KEY;
+  const apiKey = await resolveExaKey();
   if (!apiKey) {
     logger.warn("Exa AI not configured; skipping fallback");
     return [];
