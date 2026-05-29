@@ -2,6 +2,9 @@ import mongoose from "mongoose";
 import {
   ARTICLE_STATUS,
   ARTICLE_STATUS_VALUES,
+  STAGE_NAMES,
+  STAGE_STATUS,
+  STAGE_STATUS_VALUES,
 } from "#constants/articleStatus.js";
 
 /**
@@ -157,6 +160,59 @@ const statusHistoryEntrySchema = new mongoose.Schema(
   { _id: false }
 );
 
+/* ──────────────────────────────────────────────────────────
+ *  Wizard mode subdocuments — Requirement 7 (Stage_Status
+ *  persistence) + Requirement 2 (brief source selection) +
+ *  Requirement 6 (publish step config).
+ * ────────────────────────────────────────────────────────── */
+
+const stageRecordSchema = new mongoose.Schema(
+  {
+    name: { type: String, enum: STAGE_NAMES, required: true },
+    status: {
+      type: String,
+      enum: STAGE_STATUS_VALUES,
+      default: STAGE_STATUS.PENDING,
+    },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
+    approvedAt: { type: Date, default: null },
+    retryCount: { type: Number, default: 0, min: 0 },
+    chunkCount: { type: Number, default: 0, min: 0 },
+    failureReason: { type: String, default: null },
+    recoverable: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const briefSelectionsSchema = new mongoose.Schema(
+  {
+    selectedCanonicalUrls: { type: [String], default: [] },
+    updatedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
+const publishConfigSchema = new mongoose.Schema(
+  {
+    mode: {
+      type: String,
+      enum: ["draft", "now", "schedule"],
+      default: "draft",
+    },
+    scheduledAt: { type: Date, default: null },
+    cmsConnectionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CmsConnection",
+      default: null,
+    },
+    featuredImage: { type: featuredImageSchema, default: null },
+    checklistOverride: { type: Boolean, default: false },
+    checklistOverrideReason: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
 /* ── Main schema ─────────────────────────────────────────── */
 
 const articleSchema = new mongoose.Schema(
@@ -186,6 +242,31 @@ const articleSchema = new mongoose.Schema(
     },
     targetWordCount: { type: Number, default: 1500, min: 300, max: 5000 },
 
+    /**
+     * Optional per-article brand voice. When set, the draft stage uses
+     * THIS profile (looked up via brandVoiceRepository.findProfileById)
+     * instead of the workspace-active one. Resolution order:
+     *   1. article.brandVoiceProfileId (per-article opt-in)
+     *   2. workspace's active profile
+     *   3. no voice block
+     */
+    brandVoiceProfileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BrandVoiceProfile",
+      default: null,
+    },
+
+    /**
+     * Optional template the article was created from. Used purely for
+     * analytics/audit; the template's preset fields are copied onto the
+     * article at creation time and not re-read.
+     */
+    templateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Template",
+      default: null,
+    },
+
     /* Lifecycle */
     status: {
       type: String,
@@ -206,6 +287,114 @@ const articleSchema = new mongoose.Schema(
     },
     outline: { type: [sectionOutlineSchema], default: [] },
     outlinePromptVersion: { type: String, default: null },
+
+    /**
+     * Outline Enricher output (Requirement 2.5, 6.4, 6.5).
+     *
+     * Populated by `outlineEnricherService.prepareOutlineContext` on
+     * outline regenerate runs (never on the first outline pass) and
+     * passed into `runOutlineStage` as a "Recharge context" prompt block.
+     *
+     * Optional and additive: `default: undefined` so absence on an
+     * existing document is a valid state and never requires backfill.
+     */
+    outlineContext: {
+      type: new mongoose.Schema(
+        {
+          extraAngles: { type: [String], default: [] },
+          suggestedLinks: {
+            type: [
+              new mongoose.Schema(
+                {
+                  url: { type: String, required: true },
+                  anchorHint: { type: String, default: "" },
+                },
+                { _id: false }
+              ),
+            ],
+            default: [],
+          },
+          contrastFacts: {
+            type: [
+              new mongoose.Schema(
+                {
+                  factA: { type: String, required: true },
+                  factB: { type: String, required: true },
+                  sourceUrls: { type: [String], default: [] },
+                },
+                { _id: false }
+              ),
+            ],
+            default: [],
+          },
+          audienceHook: { type: String, default: null },
+          generatedAt: { type: Date, default: null },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
+
+    /**
+     * Draft Formatter output (Requirement 4.3, 6.4, 6.5).
+     *
+     * Populated by `draftFormatterService.formatDraftHtml` after the
+     * draft LLM call. Holds render-only formatting metadata that the
+     * frontend can use for hero-paragraph styling and layout-aware
+     * rendering. The top-level `paragraphs[]` field is NOT touched —
+     * `draftFormatting.paragraphs[]` is a sibling additive collection
+     * that mirrors the existing paragraph shape and adds optional
+     * `displayHints` per paragraph.
+     *
+     * Optional and additive: `default: undefined` so absence on an
+     * existing document is a valid state and never requires backfill.
+     *
+     * `displayHints.leadingHeadingLevel` (2 or 3) and
+     * `displayHints.listKind` ("bullet" | "ordered" | null) are stored
+     * without enum validators here; the value constraint is enforced
+     * by the Draft Formatter at write time.
+     */
+    draftFormatting: {
+      type: new mongoose.Schema(
+        {
+          formatVersion: { type: String, default: null },
+          paragraphs: {
+            type: [
+              new mongoose.Schema(
+                {
+                  id: { type: String, required: true },
+                  html: { type: String, required: true },
+                  markdown: { type: String, default: "" },
+                  tag: {
+                    type: String,
+                    enum: ["factual", "intro", "transition", "opinion"],
+                    required: true,
+                  },
+                  citations: { type: [citationSchema], default: [] },
+                  wordCount: { type: Number, default: 0 },
+                  displayHints: {
+                    type: new mongoose.Schema(
+                      {
+                        leadingHeadingLevel: { type: Number, default: null },
+                        isOpening: { type: Boolean, default: null },
+                        listKind: { type: String, default: null },
+                        blockquote: { type: Boolean, default: null },
+                      },
+                      { _id: false }
+                    ),
+                    default: undefined,
+                  },
+                },
+                { _id: false }
+              ),
+            ],
+            default: [],
+          },
+        },
+        { _id: false }
+      ),
+      default: undefined,
+    },
 
     paragraphs: { type: [paragraphSchema], default: [] },
     sourcesIndex: { type: [sourceIndexSchema], default: [] },
@@ -296,6 +485,17 @@ const articleSchema = new mongoose.Schema(
     /* Quota accounting */
     quotaIncrementApplied: { type: Boolean, default: false },
     quotaRefunded: { type: Boolean, default: false },
+
+    /* ── Wizard mode (Requirement 7, 2, 6) ─────────────────────
+     * `wizardMode: true` is set when the article was created via
+     * `POST /articles/wizard/start`. Stages run one at a time with
+     * Approval_Gates between them. `wizardMode: false` is the
+     * legacy one-shot Quick_Generate path which auto-approves.
+     */
+    wizardMode: { type: Boolean, default: false, index: true },
+    stages: { type: [stageRecordSchema], default: [] },
+    briefSelections: { type: briefSelectionsSchema, default: () => ({}) },
+    publishConfig: { type: publishConfigSchema, default: () => ({}) },
 
     /* View counters — denormalized for cheap list rendering. Maintained
        by the view-tracking pipeline; reset to 0 if we ever wipe ArticleView. */

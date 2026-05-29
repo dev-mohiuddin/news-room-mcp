@@ -126,7 +126,18 @@ export const totalCostsForWorkspace = async (workspaceId) => {
 
 export const topArticlesByViews = (workspaceId, limit = 10) => {
   requireScope(workspaceId, "topArticlesByViews");
-  return Article.find({ workspaceId, deletedAt: null })
+  /**
+   * Exclude in-progress articles. The widget's purpose is "top by views",
+   * so anything that hasn't reached `draft_ready` (still researching /
+   * outlining / drafting / awaiting_approval inside the wizard) cannot
+   * have meaningful views and just clutters the list. `needs_revision`
+   * is included so authors can see drafts that need their attention.
+   */
+  return Article.find({
+    workspaceId,
+    deletedAt: null,
+    status: { $in: ["draft_ready", "published", "scheduled", "needs_revision"] },
+  })
     .sort({ viewsTotal: -1, createdAt: -1 })
     .limit(limit)
     .select(

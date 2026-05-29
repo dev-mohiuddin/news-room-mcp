@@ -282,6 +282,9 @@ export const runArticlePipeline = async ({ articleId, workspaceId, userId }) => 
       wordCount: draftRes.wordCount,
       readingTimeMinutes: draftRes.readingTimeMinutes,
       draftPromptVersion: draftRes.promptVersion,
+      ...(draftRes.draftFormatting
+        ? { draftFormatting: draftRes.draftFormatting }
+        : {}),
     });
     // Persist the main draft cost AND any enrichment costs (audience etc.)
     await pushCost({ workspaceId, articleId, costEntry: draftRes.cost });
@@ -356,6 +359,7 @@ export const runArticlePipeline = async ({ articleId, workspaceId, userId }) => 
     const brief = await findBriefByArticleId(workspaceId, articleId);
     seoRes = await runSeoStage({
       workspaceId,
+      articleId,
       topic: article.topic,
       targetKeyword: article.targetKeyword,
       contentMarkdown: draftRes.contentMarkdown,

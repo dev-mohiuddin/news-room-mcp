@@ -5,6 +5,7 @@ import { adminUserRouter, userSelfRouter } from "#routes/v1/user/userRoute.js";
 import { teamRouter } from "#routes/v1/team/teamRoute.js";
 import { auditRouter } from "#routes/v1/audit/auditRoute.js";
 import { articleRouter } from "#routes/v1/article/articleRoute.js";
+import { wizardRouter } from "#routes/v1/article/wizardRoute.js";
 import { brandVoiceRouter } from "#routes/v1/article/brandVoiceRoute.js";
 import { researchRouter } from "#routes/v1/article/researchRoute.js";
 import { seoToolsRouter } from "#routes/v1/article/seoToolsRoute.js";
@@ -31,6 +32,16 @@ apiRouterV1.use("/v1", userSelfRouter);
 apiRouterV1.use("/v1", teamRouter);
 apiRouterV1.use("/v1", auditRouter);
 apiRouterV1.use("/v1", articleRouter);
+
+/**
+ * Wizard router — feature-flagged. When ENABLE_WIZARD_BACKEND=true, the
+ * router mounts and the multi-step wizard endpoints become reachable.
+ * When the flag is unset/false, requests fall through to a 404 keeping
+ * the legacy `POST /articles/generate` flow as the only generation path.
+ */
+if (process.env.ENABLE_WIZARD_BACKEND === "true") {
+  apiRouterV1.use("/v1", wizardRouter);
+}
 apiRouterV1.use("/v1", brandVoiceRouter);
 apiRouterV1.use("/v1", researchRouter);
 apiRouterV1.use("/v1", seoToolsRouter);

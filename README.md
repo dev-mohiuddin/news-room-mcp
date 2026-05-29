@@ -91,6 +91,81 @@ cp .env.example .env   # Fill in values
 npm run dev            # → http://localhost:8000
 ```
 
+> **The backend has two processes.** `npm run dev` starts the API server.
+> `npm run worker:dev` starts the BullMQ worker that runs article-generation
+> jobs. Both must be running for article generation to work end-to-end.
+
+## ✨ Multi-Step Article Wizard
+
+The wizard restores the original five-step flow (Research → Outline → Draft → SEO → Publish) with chunk-based Socket.io streaming and a TipTap rich-text editor with inline citations. Existing `POST /articles/generate` ("Quick Generate") stays untouched.
+
+### Enabling the wizard
+
+Toggle two feature flags — backend first, then frontend:
+
+```bash
+# backend/.env
+ENABLE_WIZARD_BACKEND=true
+WIZARD_STAGE_WORKER_CONCURRENCY=5
+QUOTA_RECONCILIATION_INTERVAL_MIN=60
+
+# frontend/.env
+VITE_ENABLE_WIZARD=true
+```
+
+Restart the API, the worker, and the Vite dev server. Navigate to `/dashboard/new-article` — when the flag is on you'll see the new wizard, when off the legacy one-shot form continues to render.
+
+### Wizard endpoints
+
+All under `/api/v1` and gated by `ENABLE_WIZARD_BACKEND`:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/articles/wizard/start` | Reserve quota + create wizard-mode article |
+| POST | `/articles/:id/stages/:stage/run` | Run one stage (research/outline/draft/seo) |
+| POST | `/articles/:id/stages/:stage/approve` | Gate next stage |
+| POST | `/articles/:id/stages/:stage/regenerate` | Re-run stage + cascade clear downstream |
+| POST | `/articles/:id/stages/:stage/retry` | Retry failed stage (3-strike rule) |
+| PATCH | `/articles/:id/brief/source-selections` | Pick which sources back the brief |
+| PATCH | `/articles/:id/outline` | Save outline edits (1-20 sections) |
+| POST | `/articles/:id/outline/sections` | Append a new section |
+| DELETE | `/articles/:id/outline/sections/:idx` | Remove a section |
+| GET | `/articles/:id/stages/:stage/chunks?since=N` | Replay missed Socket.io chunks |
+| POST | `/articles/:id/wizard/abandon` | Soft-delete + refund quota |
+
+### Streaming events
+
+The worker fan-outs the following Socket.io events (scoped to `workspace:{workspaceId}`):
+
+- `article:stage_started` — `{ articleId, stage, retryCount, startedAt }`
+- `article:stage_chunk` — `{ articleId, stage, chunkIndex, chunkType, data, timestamp }`
+- `article:stage_completed` — `{ articleId, stage, completedAt, totalChunks, output }`
+- `article:stage_failed` — `{ articleId, stage, failureReason, recoverable, retryCount }`
+
+Chunks are buffered in Redis at `wizard:chunks:{articleId}:{stage}` with a 60-minute TTL and a 500-entry cap per stage so reconnecting clients can replay.
+
+### Operational scripts
+
+```bash
+# Backfill stages[] on legacy articles created before the wizard feature
+node backend/scripts/backfillArticleStages.js          # dry-run
+node backend/scripts/backfillArticleStages.js --apply  # commit
+
+# End-to-end smoke test (start → research → outline → draft → seo)
+node backend/scripts/wizardSmokeTest.js
+
+# Cleanup orphan articles (legacy)
+node backend/scripts/cleanupOrphanArticles.js --apply
+```
+
+### Background sweepers (run inside the worker process)
+
+| Sweeper | Cadence | Purpose |
+|---------|---------|---------|
+| `scheduledPublishSweeper` | 5 min | Re-enqueue overdue scheduled publishes |
+| `quotaReconciliationSweeper` | 1 hour (configurable via `QUOTA_RECONCILIATION_INTERVAL_MIN`) | Refund any failed-with-quota-pending articles |
+
+
 ## 📦 Build
 
 ```bash
@@ -102,8 +177,8 @@ npm run build      # Production build → dist/
 
 | Role | Email | Password |
 |------|-------|----------|
-| Super Admin | admin@newsroommcp.com | demo-admin-2026 |
-| Publisher | user@newsroommcp.com | demo-user-2026 |
+| Super Admin | admin@newsroommcp.com | Admin@12345 |
+| Publisher | user@newsroommcp.com | User@12345 |
 
 Or use the **1-click demo cards** on the login page — no typing needed.
 

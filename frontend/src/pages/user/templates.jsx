@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   Plus,
   Copy,
@@ -48,6 +49,7 @@ const EMPTY_DRAFT = {
 
 export default function TemplatesPage() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { list, isLoading, isMutating } = useSelector((s) => s.templates);
 
   const [editTarget, setEditTarget] = useState(null);
@@ -178,9 +180,7 @@ export default function TemplatesPage() {
                     size="sm"
                     className="flex-1"
                     onClick={() =>
-                      toast.success(
-                        "Open New Article — template will be applied there."
-                      )
+                      navigate(`/dashboard/new-article?templateId=${t.id}`)
                     }
                   >
                     Use template

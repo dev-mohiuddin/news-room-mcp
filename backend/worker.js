@@ -13,9 +13,14 @@ import dotenv from "dotenv";
 import { connectDatabase } from "#config/dbConnect.js";
 import { logger } from "#utils/logger.js";
 import { startArticleWorker } from "#workers/articleWorker.js";
+import { startWizardStageWorker } from "#workers/wizardStageWorker.js";
 import { startScheduledPublishWorker } from "#workers/scheduledPublishWorker.js";
 import { startEmailWorker } from "#workers/emailWorker.js";
 import { startScheduledPublishSweeper, stopScheduledPublishSweeper } from "#jobs/scheduledPublishSweeper.js";
+import {
+  startQuotaReconciliationSweeper,
+  stopQuotaReconciliationSweeper,
+} from "#jobs/quotaReconciliationSweeper.js";
 import { assertOriginalityConfig } from "#services/external/originalityProviders.js";
 // Eagerly import the socket module so the Redis adapter attaches at boot.
 // Without this, the worker only attaches on first emit — small jobs may
@@ -33,16 +38,20 @@ const start = async () => {
     process.exit(1);
   }
   const articleWorker = startArticleWorker();
+  const wizardWorker = startWizardStageWorker();
   const scheduledWorker = startScheduledPublishWorker();
   const emailWorker = startEmailWorker();
   startScheduledPublishSweeper();
+  startQuotaReconciliationSweeper();
 
   const shutdown = async (signal) => {
     logger.info(`Worker received ${signal}; closing…`);
     try {
       stopScheduledPublishSweeper();
+      stopQuotaReconciliationSweeper();
       await Promise.allSettled([
         articleWorker.close(),
+        wizardWorker.close(),
         scheduledWorker.close(),
         emailWorker.close(),
       ]);

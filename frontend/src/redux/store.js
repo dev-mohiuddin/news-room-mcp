@@ -21,6 +21,7 @@ import analyticsSlice from "./slice/analytics-slice";
 import templateSlice from "./slice/template-slice";
 import userSlice from "./slice/user-slice";
 import integrationSlice from "./slice/integration-slice";
+import wizardSlice from "./slice/wizard-slice";
 
 // Persist only auth + ui (rest are server data)
 const persistConfig = {
@@ -49,6 +50,7 @@ const rootReducer = combineReducers({
   templates: templateSlice,
   user: userSlice,
   integrations: integrationSlice,
+  wizard: wizardSlice,
 });
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

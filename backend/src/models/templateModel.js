@@ -26,6 +26,42 @@ const templateSchema = new mongoose.Schema(
     targetWordCount: { type: Number, default: 1500, min: 200, max: 6000 },
     uses: { type: Number, default: 0 },
     lastUsedAt: { type: Date, default: null },
+
+    /**
+     * Preset fields applied to a new article when this template is
+     * selected on `POST /articles/wizard/start`. All optional — the
+     * wizard falls back to its own defaults when a field is empty.
+     */
+    tonePreset: {
+      type: String,
+      enum: ["Professional", "Casual", "Journalistic", "Academic", null],
+      default: null,
+    },
+    additionalKeywords: { type: [String], default: [] },
+    /**
+     * Optional outline scaffold. Stored in the same shape as
+     * `articleSchema.outline` so the wizard can use it directly. When
+     * present, the outline stage is skipped — the user can still edit
+     * sections via the standard PATCH endpoints.
+     */
+    outlinePreset: {
+      type: [
+        new mongoose.Schema(
+          {
+            heading: { type: String, required: true },
+            subPoints: { type: [String], default: [] },
+            estimatedWordCount: { type: Number, default: 250 },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
+    brandVoiceProfileId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "BrandVoiceProfile",
+      default: null,
+    },
   },
   { timestamps: true, versionKey: false }
 );

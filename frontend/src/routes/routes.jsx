@@ -32,6 +32,7 @@ import {
   // User pages
   UserDashboard,
   NewArticle,
+  NewArticleEntry,
   Articles,
   ArticleDetail,
   Research,
@@ -151,7 +152,8 @@ export const privateRoutes = [
     ],
     children: [
       { index: true, element: <UserDashboard /> },
-      { path: "new-article", element: <NewArticle /> },
+      { path: "new-article", element: <NewArticleEntry /> },
+      { path: "new-article/:articleId", element: <NewArticleEntry /> },
       { path: "articles", element: <Articles /> },
       { path: "articles/:id", element: <ArticleDetail /> },
       { path: "research", element: <Research /> },

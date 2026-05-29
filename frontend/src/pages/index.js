@@ -32,6 +32,7 @@ import AdminRoles from "./admin/roles";
 // User
 import UserDashboard from "./user/dashboard";
 import NewArticle from "./user/new-article";
+import NewArticleEntry from "./user/new-article-entry";
 import Articles from "./user/articles";
 import ArticleDetail from "./user/article-detail";
 import Research from "./user/research";
@@ -81,6 +82,7 @@ export {
   // User
   UserDashboard,
   NewArticle,
+  NewArticleEntry,
   Articles,
   ArticleDetail,
   Research,

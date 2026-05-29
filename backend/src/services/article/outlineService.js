@@ -45,7 +45,118 @@ const OUTLINE_TOOL_INPUT_SCHEMA = {
   required: ["sections"],
 };
 
-const buildPrompt = ({ topic, targetKeyword, tone, targetWordCount, brief }) => {
+/**
+ * Build the "Recharge context" block appended to the end of the outline
+ * prompt body when an `outlineContext` is supplied (i.e., on outline
+ * regenerate / "recharge" runs — Requirement 2.4).
+ *
+ * Returns the full block including the leading separator, or an empty
+ * string when no usable context is present. The empty-string return is
+ * what guarantees byte-identical prompt output on the first-ever
+ * outline run path.
+ *
+ * Shape of `outlineContext` (produced by `outlineEnricherService`):
+ *   {
+ *     extraAngles:    string[3..5],
+ *     suggestedLinks: { url, anchorHint }[3..5],
+ *     contrastFacts:  { factA, factB, sourceUrls }[2],
+ *     audienceHook:   string,
+ *   }
+ */
+const buildRechargeContextBlock = (outlineContext) => {
+  if (!outlineContext || typeof outlineContext !== "object") return "";
+
+  const angles = Array.isArray(outlineContext.extraAngles)
+    ? outlineContext.extraAngles.filter(
+        (a) => typeof a === "string" && a.trim().length > 0
+      )
+    : [];
+  const links = Array.isArray(outlineContext.suggestedLinks)
+    ? outlineContext.suggestedLinks.filter(
+        (l) =>
+          l &&
+          typeof l === "object" &&
+          typeof l.url === "string" &&
+          l.url.trim().length > 0
+      )
+    : [];
+  const contrast = Array.isArray(outlineContext.contrastFacts)
+    ? outlineContext.contrastFacts.filter(
+        (c) =>
+          c &&
+          typeof c === "object" &&
+          typeof c.factA === "string" &&
+          c.factA.trim().length > 0 &&
+          typeof c.factB === "string" &&
+          c.factB.trim().length > 0
+      )
+    : [];
+  const hook =
+    typeof outlineContext.audienceHook === "string" &&
+    outlineContext.audienceHook.trim().length > 0
+      ? outlineContext.audienceHook.trim()
+      : "";
+
+  // If every field is empty/missing, treat as absent and emit nothing so
+  // the prompt remains byte-identical to the pre-feature output.
+  if (!angles.length && !links.length && !contrast.length && !hook) {
+    return "";
+  }
+
+  // Two leading blank lines ("", "") create a blank separator after the
+  // existing prompt body before "Recharge context:".
+  const lines = ["", "", "Recharge context:"];
+
+  if (angles.length) {
+    lines.push("Extra angles to consider:");
+    angles.forEach((a) => lines.push(`- ${a.trim()}`));
+  }
+
+  if (links.length) {
+    lines.push(
+      "Suggested links to weave in (use these URLs verbatim if you cite anything):"
+    );
+    links.forEach((l) => {
+      const url = l.url.trim();
+      const hint =
+        typeof l.anchorHint === "string" && l.anchorHint.trim().length > 0
+          ? ` — ${l.anchorHint.trim()}`
+          : "";
+      lines.push(`- ${url}${hint}`);
+    });
+  }
+
+  if (contrast.length) {
+    lines.push("Contrasting facts to surface:");
+    contrast.forEach((c) => {
+      lines.push(`- A: ${c.factA.trim()}`);
+      lines.push(`  B: ${c.factB.trim()}`);
+      const sources = Array.isArray(c.sourceUrls)
+        ? c.sourceUrls
+            .filter((u) => typeof u === "string" && u.trim().length > 0)
+            .map((u) => u.trim())
+        : [];
+      if (sources.length) {
+        lines.push(`  Sources: ${sources.join(", ")}`);
+      }
+    });
+  }
+
+  if (hook) {
+    lines.push(`Audience hook (use as opening voice cue): ${hook}`);
+  }
+
+  return lines.join("\n");
+};
+
+const buildPrompt = ({
+  topic,
+  targetKeyword,
+  tone,
+  targetWordCount,
+  brief,
+  outlineContext,
+}) => {
   const bullets = (brief?.summaryBullets || [])
     .map((b, i) => `${i + 1}. ${b.text}`)
     .join("\n");
@@ -57,7 +168,7 @@ const buildPrompt = ({ topic, targetKeyword, tone, targetWordCount, brief }) => 
     )
     .join("\n\n");
 
-  return [
+  const basePrompt = [
     `Topic: ${topic}`,
     `Target keyword: ${targetKeyword}`,
     `Writing tone: ${tone}`,
@@ -71,6 +182,10 @@ const buildPrompt = ({ topic, targetKeyword, tone, targetWordCount, brief }) => 
     "",
     "Produce a structured outline as 4–10 sections. The sum of estimatedWordCount values must be within ±10% of the target total word count. Each section should have a clear, action-oriented heading and 2–6 sub-points capturing what the section will cover.",
   ].join("\n");
+
+  // When `outlineContext` is undefined / null / empty, this returns "" and
+  // the prompt is byte-identical to the pre-feature output (Requirement 2.4).
+  return basePrompt + buildRechargeContextBlock(outlineContext);
 };
 
 const validateOutline = (outline, targetWordCount) => {
@@ -118,6 +233,7 @@ export const runOutlineStage = async ({
   tone,
   targetWordCount,
   brief,
+  outlineContext,
 }) => {
   let lastError = null;
   let lastUsage = null;
@@ -141,6 +257,7 @@ export const runOutlineStage = async ({
           tone,
           targetWordCount,
           brief,
+          outlineContext,
         }),
         toolName: "submit_outline",
         toolDescription:

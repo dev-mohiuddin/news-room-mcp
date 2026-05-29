@@ -124,7 +124,7 @@ export const extractAndSaveVoiceProfile = async ({
 export const buildVoiceBlock = (profile) => {
   if (!profile?.profile?.toneSummary) return "";
   const p = profile.profile;
-  return [
+  const blocks = [
     "# BRAND VOICE — must follow throughout the draft",
     `Profile name: ${profile.name}`,
     `Tone: ${p.toneSummary}`,
@@ -137,9 +137,24 @@ export const buildVoiceBlock = (profile) => {
     p.avoidList?.length
       ? `AVOID: ${p.avoidList.join(" | ")}`
       : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ];
+
+  /* ── Optional few-shot writing samples ──
+   * When the profile has saved samples, inject the first 1-2 as concrete
+   * examples of the desired writing style. This gives the model a direct
+   * reference for sentence rhythm, vocabulary, and voice traits.
+   */
+  if (profile.samples?.length) {
+    const sampleTexts = profile.samples
+      .slice(0, 2)
+      .map((s, i) => `[Example ${i + 1}: ${s.title || "untitled"}]\n${(s.text || "").slice(0, 1500)}`)
+      .join("\n\n");
+    if (sampleTexts) {
+      blocks.push("", "# WRITING EXAMPLES — emulate this style", sampleTexts);
+    }
+  }
+
+  return blocks.filter(Boolean).join("\n");
 };
 
 export const seedAndExtract = async ({

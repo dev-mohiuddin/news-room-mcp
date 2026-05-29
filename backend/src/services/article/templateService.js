@@ -11,6 +11,14 @@ const sanitize = (template) => {
     description: obj.description || "",
     category: obj.category || "General",
     targetWordCount: obj.targetWordCount || 1500,
+    tonePreset: obj.tonePreset || null,
+    additionalKeywords: Array.isArray(obj.additionalKeywords)
+      ? obj.additionalKeywords
+      : [],
+    outlinePreset: Array.isArray(obj.outlinePreset) ? obj.outlinePreset : [],
+    brandVoiceProfileId: obj.brandVoiceProfileId
+      ? obj.brandVoiceProfileId.toString()
+      : null,
     uses: obj.uses || 0,
     lastUsedAt: obj.lastUsedAt,
     createdAt: obj.createdAt,

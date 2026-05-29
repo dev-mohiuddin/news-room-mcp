@@ -22,6 +22,33 @@ export const SKIP_REASONS = [
   "duplicate_content",
 ];
 
+/**
+ * Per-source enrichment sub-document (additive, optional).
+ * Populated by the Source Enrichment Service (Requirement 1) when a source
+ * is selected by the user; absence on a persisted document is the canonical
+ * "un-enriched" state and is a valid state for backward compatibility
+ * (Requirements 6.4, 6.5).
+ */
+const sourceEnrichmentKeyFactSchema = new mongoose.Schema(
+  {
+    text: { type: String },
+    citationUrl: { type: String },
+  },
+  { _id: false }
+);
+
+const sourceEnrichmentSchema = new mongoose.Schema(
+  {
+    summary: { type: String },                              // 2–3 sentences
+    keyFacts: { type: [sourceEnrichmentKeyFactSchema], default: undefined },
+    illustrativeSnippet: { type: String },                  // ≤ 25 words, verbatim
+    suggestedAngle: { type: String },                       // 1 sentence
+    enrichedAt: { type: Date },
+    modelUsed: { type: String },
+  },
+  { _id: false }
+);
+
 const sourceSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },                  // canonical
@@ -38,6 +65,10 @@ const sourceSchema = new mongoose.Schema(
       enum: [null, ...SKIP_REASONS],
       default: null,
     },
+
+    /* Optional, additive — populated by Source Enrichment Service (Requirement 1).
+     * default: undefined ensures absence is the canonical un-enriched state. */
+    enrichment: { type: sourceEnrichmentSchema, default: undefined },
   },
   { _id: false }
 );
@@ -46,6 +77,22 @@ const briefSummaryEntrySchema = new mongoose.Schema(
   {
     text: { type: String, required: true },
     citationUrls: { type: [String], default: [] },
+  },
+  { _id: false }
+);
+
+/**
+ * Brief-level aggregate enrichment sub-document (additive, optional).
+ * Populated by the Source Enrichment Service after per-source enrichment
+ * completes; absence is the canonical "un-enriched" state (Requirements
+ * 6.4, 6.5 — no document migration needed).
+ */
+const briefEnrichmentSchema = new mongoose.Schema(
+  {
+    crossSourceContrasts: { type: [String], default: undefined },     // 0–3
+    sharedThemes: { type: [String], default: undefined },             // 0–5
+    coverageGaps: { type: [String], default: undefined },             // 0–3
+    enrichedAt: { type: Date },
   },
   { _id: false }
 );
@@ -75,6 +122,10 @@ const researchBriefSchema = new mongoose.Schema(
 
     /* AI-generated summary brief used by outline + draft prompts */
     summaryBullets: { type: [briefSummaryEntrySchema], default: [] },
+
+    /* Optional, additive — populated by Source Enrichment Service (Requirement 1).
+     * default: undefined ensures absence is the canonical un-enriched state. */
+    briefEnrichment: { type: briefEnrichmentSchema, default: undefined },
 
     /* Diagnostics */
     searchProvider: {

@@ -66,18 +66,23 @@ export const generateText = async ({
   prompt,
   maxTokens = 1024,
   temperature = 0.7,
+  topP,
   stopSequences,
 } = {}) => {
   const client = await getClient();
   const start = Date.now();
-  const response = await client.messages.create({
+  const sdkParams = {
     model,
     max_tokens: maxTokens,
     temperature,
     system,
     stop_sequences: stopSequences,
     messages: [{ role: "user", content: prompt }],
-  });
+  };
+  if (typeof topP === "number" && topP > 0 && topP <= 1) {
+    sdkParams.top_p = topP;
+  }
+  const response = await client.messages.create(sdkParams);
   const latencyMs = Date.now() - start;
   const text = response.content
     ?.filter((block) => block.type === "text")
@@ -117,11 +122,12 @@ export const useTool = async ({
   toolInputSchema,
   maxTokens = 4096,
   temperature = 0.4,
+  topP,
 } = {}) => {
   const client = await getClient();
   const start = Date.now();
 
-  const response = await client.messages.create({
+  const sdkParams = {
     model,
     max_tokens: maxTokens,
     temperature,
@@ -135,7 +141,11 @@ export const useTool = async ({
     ],
     tool_choice: { type: "tool", name: toolName },
     messages: [{ role: "user", content: prompt }],
-  });
+  };
+  if (typeof topP === "number" && topP > 0 && topP <= 1) {
+    sdkParams.top_p = topP;
+  }
+  const response = await client.messages.create(sdkParams);
 
   const latencyMs = Date.now() - start;
   const toolUse = response.content?.find((block) => block.type === "tool_use");
